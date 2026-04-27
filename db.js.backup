@@ -1,0 +1,62 @@
+const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
+
+const db = new Database('./pollmind.db');
+console.log('✓ Connecté à la base de données SQLite');
+
+// Initialisation des tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    is_admin INTEGER DEFAULT 0,
+    points REAL DEFAULT 100,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS questions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT,
+    created_by INTEGER NOT NULL,
+    status TEXT DEFAULT 'open',
+    resolution TEXT,
+    resolved_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS options (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    is_correct INTEGER DEFAULT 0,
+    FOREIGN KEY (question_id) REFERENCES questions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS bets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    option_id INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    price REAL NOT NULL,
+    shares REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (question_id) REFERENCES questions(id),
+    FOREIGN KEY (option_id) REFERENCES options(id)
+  );
+`);
+
+// Créer un admin par défaut
+const existingAdmin = db.prepare('SELECT * FROM users WHERE username = ?').get('admin');
+if (!existingAdmin) {
+  const hashedPassword = bcrypt.hashSync('admin123', 10);
+  db.prepare('INSERT INTO users (username, password, is_admin, points) VALUES (?, ?, 1, 1000)')
+    .run('admin', hashedPassword);
+  console.log('✓ Utilisateur admin créé (username: admin, password: admin123)');
+}
+
+module.exports = db;
