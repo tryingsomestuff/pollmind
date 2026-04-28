@@ -26,6 +26,7 @@ async function initDatabase() {
       password TEXT NOT NULL,
       is_admin INTEGER DEFAULT 0,
       points REAL DEFAULT 100,
+      last_bonus_date DATETIME,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 

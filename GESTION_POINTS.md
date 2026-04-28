@@ -41,6 +41,12 @@ async function redistributePoints() {
   // Option B: Donner 50 points à ceux qui ont moins de 10
   db.run('UPDATE users SET points = points + 50 WHERE points < 10 AND is_admin = 0');
 }
+
+**Note:** Cette fonctionnalité est maintenant implémentée dans l'application. Utilisez le bouton 🎁 dans le header pour réclamer votre bonus quotidien de 10 points.
+
+
+**Note:** Cette fonctionnalité est maintenant implémentée dans l'application. Utilisez le bouton 🎁 dans le header pour réclamer votre bonus quotidien de 10 points.
+
 ```
 
 **Quand l'utiliser :**

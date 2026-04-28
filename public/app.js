@@ -587,6 +587,35 @@ async function refreshProfile() {
   }
 }
 
+// Réclamer le bonus journalier
+async function claimDailyBonus() {
+  try {
+    const response = await fetch('/api/daily-bonus', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      if (data.alreadyClaimed) {
+        alert(`⏰ ${data.message}\n${data.nextBonus}`);
+      } else {
+        alert(`🎁 ${data.message}\n+${data.bonus} points!`);
+        await refreshProfile(); // Rafraîchir pour montrer les nouveaux points
+      }
+    } else {
+      alert('Erreur: ' + (data.error || 'Impossible de réclamer le bonus'));
+    }
+  } catch (error) {
+    console.error('Erreur lors de la réclamation du bonus:', error);
+    alert('Erreur lors de la réclamation du bonus');
+  }
+}
+
+
 function formatDate(dateString) {
   const date = new Date(dateString);
   const now = new Date();

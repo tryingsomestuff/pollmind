@@ -125,6 +125,35 @@ app.get('/api/profile', authenticateToken, (req, res) => {
   }
 });
 
+// Bonus journalier
+app.post('/api/daily-bonus', authenticateToken, (req, res) => {
+  try {
+    const user = queryOne('SELECT points, last_bonus_date FROM users WHERE id = ?', [req.user.id]);
+    
+    const today = new Date().toISOString().split('T')[0];
+    // SQLite stocke les dates avec un espace, pas un 'T'
+    const lastBonus = user.last_bonus_date ? user.last_bonus_date.split(' ')[0] : null;
+    
+    if (lastBonus !== today) {
+      run('UPDATE users SET points = points + 10, last_bonus_date = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id]);
+      res.json({ 
+        message: 'Bonus journalier reçu!', 
+        bonus: 10, 
+        newBalance: user.points + 10 
+      });
+    } else {
+      res.json({ 
+        message: 'Bonus déjà réclamé aujourd\'hui',
+        alreadyClaimed: true,
+        nextBonus: 'Revenez demain!'
+      });
+    }
+  } catch (error) {
+    console.error('Erreur bonus journalier:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ========== ROUTES QUESTIONS ==========
 
 // Créer une question (admin seulement)

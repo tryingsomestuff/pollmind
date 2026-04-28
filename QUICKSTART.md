@@ -30,6 +30,18 @@
 - ✅ Résoudre des questions
 - ✅ Distribution automatique des gains
 
+### 🎁 Bonus Journalier
+
+Chaque utilisateur peut réclamer un bonus de **10 points par jour**:
+
+- Cliquez sur le bouton **🎁 Bonus** dans le header
+- Si vous n'avez pas encore réclamé aujourd'hui, vous recevrez 10 points
+- Si vous avez déjà réclamé, un message vous indiquera de revenir demain
+- Le bonus se réinitialise à minuit (UTC)
+
+**Astuce:** Si vous n'avez plus de points, réclamez votre bonus journalier pour pouvoir continuer à parier !
+
+
 ## 💡 Pricing dynamique (Automated Market Maker)
 
 ### Comment ça fonctionne ?
