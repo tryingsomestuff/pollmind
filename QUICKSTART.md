@@ -148,6 +148,8 @@ C'est exactement ce qu'utilisent les grandes plateformes de prédiction pour avo
 
 ## 🔧 Commandes utiles
 
+### Avec Node.js (installation locale)
+
 ```bash
 # Démarrer le serveur
 npm start
@@ -158,6 +160,26 @@ npm run dev
 # Arrêter le serveur
 Ctrl+C dans le terminal
 ```
+
+### Avec Docker
+
+```bash
+# Démarrer l'application
+docker compose up -d
+
+# Voir les logs
+docker compose logs -f
+
+# Arrêter l'application
+docker compose down
+
+# Backup de la base de données
+docker run --rm -v pollmind_pollmind-data:/data \
+  -v $(pwd):/backup alpine \
+  cp /data/pollmind.db /backup/pollmind-backup-$(date +%Y%m%d).db
+```
+
+**📖 Documentation complète :** Consultez [DOCKER.md](DOCKER.md) pour plus d'options
 
 ## 📁 Fichiers importants
 

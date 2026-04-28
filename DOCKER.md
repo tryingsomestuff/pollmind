@@ -6,13 +6,13 @@
 
 ```bash
 # Construire et démarrer
-docker-compose up -d
+docker compose up -d
 
 # Voir les logs
-docker-compose logs -f
+docker compose logs -f
 
 # Arrêter
-docker-compose down
+docker compose down
 ```
 
 L'application sera accessible sur : **http://localhost:3000**
@@ -57,7 +57,7 @@ docker volume rm pollmind-data
 ### Variables d'environnement
 
 ```bash
-# docker-compose.yml
+# docker compose.yml
 environment:
   - NODE_ENV=production
   - PORT=3000
@@ -67,7 +67,7 @@ environment:
 ### Personnaliser le port
 
 ```bash
-# Dans docker-compose.yml
+# Dans docker compose.yml
 ports:
   - "8080:3000"  # Exposer sur le port 8080 au lieu de 3000
 ```
@@ -113,19 +113,19 @@ docker build -t pollmind:1.0.0 .
 
 ```bash
 # Reconstruire après modification du code
-docker-compose up -d --build
+docker compose up -d --build
 
 # Voir les logs en temps réel
-docker-compose logs -f pollmind
+docker compose logs -f pollmind
 
 # Entrer dans le container
-docker-compose exec pollmind sh
+docker compose exec pollmind sh
 
 # Vérifier l'état de santé
 docker inspect pollmind | grep Health -A 10
 
 # Nettoyer les ressources Docker
-docker-compose down -v  # Attention : supprime aussi les volumes !
+docker compose down -v  # Attention : supprime aussi les volumes !
 ```
 
 ## 🌐 Déploiement en production
@@ -146,7 +146,7 @@ cp .env.example .env
 nano .env  # Modifier SECRET_KEY
 
 # 4. Lancer
-docker-compose up -d
+docker compose up -d
 
 # 5. Vérifier
 curl http://localhost:3000
@@ -192,7 +192,7 @@ docker push votre-registry/pollmind:latest
    ```
 
 2. **Variables d'environnement** :
-   - Ne pas mettre de secrets dans `docker-compose.yml`
+   - Ne pas mettre de secrets dans `docker compose.yml`
    - Utiliser un fichier `.env` (non versionné)
 
 3. **HTTPS** :
@@ -270,7 +270,7 @@ docker run --rm -v pollmind_pollmind-data:/data \
 
 ```bash
 # Voir les logs d'erreur
-docker-compose logs pollmind
+docker compose logs pollmind
 
 # Vérifier la santé
 docker ps -a
@@ -286,7 +286,7 @@ chmod 755 data
 ### Le port 3000 est déjà utilisé
 
 ```bash
-# Changer le port dans docker-compose.yml
+# Changer le port dans docker compose.yml
 ports:
   - "8080:3000"
 ```
@@ -296,7 +296,7 @@ ports:
 ### Logs en continu
 
 ```bash
-docker-compose logs -f --tail=100
+docker compose logs -f --tail=100
 ```
 
 ### Métriques du container

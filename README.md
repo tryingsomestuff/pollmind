@@ -2,15 +2,26 @@
 
 Système de marché de prédiction interne pour questions scientifiques et techniques.
 
-## Installation
+## 🚀 Démarrage rapide
+
+### Option 1 : Docker (recommandé)
 
 ```bash
-npm install
+# Démarrer avec Docker Compose
+docker compose up -d
+
+# L'application sera accessible sur http://localhost:3000
 ```
 
-## Lancement
+**Voir [DOCKER.md](DOCKER.md) pour la documentation complète Docker**
+
+### Option 2 : Installation locale (Node.js)
 
 ```bash
+# Installer les dépendances
+npm install
+
+# Démarrer le serveur
 npm start
 ```
 
