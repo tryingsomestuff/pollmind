@@ -1,0 +1,24 @@
+services:
+  pollmind:
+    build: .
+    container_name: pollmind-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - SECRET_KEY=pollmind-secret-key-change-in-production
+    volumes:
+      # Volume Docker nommé uniquement pour la base de données
+      - pollmind-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/profile', (r) => {process.exit(r.statusCode === 401 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  pollmind-data:
+    driver: local

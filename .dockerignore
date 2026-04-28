@@ -1,0 +1,25 @@
+# Dépendances
+node_modules
+npm-debug.log
+
+# Base de données locale (sera créée dans le container)
+*.db
+
+# Fichiers de développement
+.git
+.gitignore
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environnement
+.env
+.env.local
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml

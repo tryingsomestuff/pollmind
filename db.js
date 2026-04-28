@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const fs = require('fs');
 
 let db = null;
-const DB_FILE = './pollmind.db';
+const DB_FILE = './data/pollmind.db';
 
 async function initDatabase() {
   const SQL = await initSqlJs();
