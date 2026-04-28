@@ -25,8 +25,9 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001 && \
     chown -R nodejs:nodejs /app
 
-# Passer à l'utilisateur non-root
-USER nodejs
+# Copier le script d'entrée et le rendre exécutable
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Exposer le port 3000
 EXPOSE 3000
@@ -39,5 +40,5 @@ ENV NODE_ENV=production \
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/api/profile', (r) => {process.exit(r.statusCode === 401 ? 0 : 1)})"
 
-# Commande de démarrage
-CMD ["node", "server.js"]
+# Utiliser le script d'entrée pour fixer les permissions puis démarrer
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
