@@ -1,5 +1,7 @@
 // Configuration
-const API_URL = 'http://localhost:3000/api';
+// Détecte automatiquement le chemin de base (fonctionne avec /pollmind/ ou en direct)
+const BASE_PATH = window.location.pathname.split('/')[1] === 'pollmind' ? '/pollmind' : '';
+const API_URL = `${BASE_PATH}/api`;
 let currentUser = null;
 let authToken = null;
 
@@ -590,7 +592,7 @@ async function refreshProfile() {
 // Réclamer le bonus journalier
 async function claimDailyBonus() {
   try {
-    const response = await fetch('/api/daily-bonus', {
+    const response = await fetch(`${API_URL}/daily-bonus`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${authToken}`
