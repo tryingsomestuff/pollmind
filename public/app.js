@@ -1,6 +1,7 @@
 // Configuration
 // Détecte automatiquement le chemin de base (fonctionne avec /pollmind/ ou en direct)
-const BASE_PATH = window.location.pathname.split('/')[1] === 'pollmind' ? '/pollmind' : '';
+const pathParts = window.location.pathname.split('/').filter(p => p);
+const BASE_PATH = pathParts[0] === 'pollmind' ? '/pollmind' : '';
 const API_URL = `${BASE_PATH}/api`;
 let currentUser = null;
 let authToken = null;
