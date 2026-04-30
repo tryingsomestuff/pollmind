@@ -28,6 +28,55 @@ npm start
 Pour le développement avec auto-reload:
 ```bash
 npm run dev
+
+## ⚙️ Configuration NPM Registry
+
+Selon votre environnement, vous devez configurer le registry npm approprié :
+
+### En dehors du réseau Michelin (usage public)
+
+```bash
+# Supprimer toute configuration précédente
+npm config delete registry
+
+# Configurer le registry public
+npm config set registry https://registry.npmjs.org/
+
+# Supprimer les installations précédentes
+rm -rf node_modules package-lock.json
+
+# Réinstaller les dépendances
+npm install
+```
+
+### Sur le réseau Michelin (réseau interne)
+
+```bash
+# Supprimer toute configuration précédente
+npm config delete registry
+
+# Configurer l'Artifactory Michelin
+npm config set registry https://artifactory.michelin.com/api/npm/npm/
+
+# Supprimer les installations précédentes
+rm -rf node_modules package-lock.json
+
+# Réinstaller les dépendances
+npm install
+```
+
+### Rebuild Docker après changement de registry
+
+Après avoir changé le registry et régénéré le \`package-lock.json\`, il faut rebuilder l'image Docker :
+
+```bash
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+**⚠️ Note importante** : Le \`package-lock.json\` contient les URLs exactes des packages. Il doit être régénéré à chaque changement de registry, ainsi que le dossier \`node_modules\`.
+
 ```
 
 ## Utilisation
