@@ -249,8 +249,14 @@ function renderQuestionCard(question, options = {}) {
     allowBetting = false,
     showDeleteButton = false,
     deleteScope = 'resolved',
-    showResolvedBadge = true
+    showResolvedBadge = true,
+    showCurrentUserPosition = false
   } = options;
+
+  const userTotalStake = question.options.reduce(
+    (sum, option) => sum + Number(option.user_amount || 0),
+    0
+  );
 
   return `
     <div class="question-card">
@@ -262,12 +268,18 @@ function renderQuestionCard(question, options = {}) {
         <div class="question-meta">By ${question.creator_name} • ${formatDate(question.created_at)}</div>
       </div>
       ${question.description ? `<div class="question-description">${question.description}</div>` : ''}
+      ${showCurrentUserPosition && userTotalStake === 0 ? `
+        <div class="question-description">You did not place a bet on this question.</div>
+      ` : ''}
       <div class="options-grid">
         ${question.options.map(option => `
           <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
             <div class="option-info">
               <div class="option-text">${option.text}</div>
               <div class="option-stats">${option.bet_count} bets • ${option.total_shares.toFixed(2)} shares outstanding</div>
+              ${showCurrentUserPosition && Number(option.user_amount || 0) > 0 ? `
+                <div class="option-stats">Your stake: ${Number(option.user_amount).toFixed(2)} points • Your shares: ${Number(option.user_shares || 0).toFixed(4)}</div>
+              ` : ''}
             </div>
             <div class="option-price">${formatProbability(option.probability || 0)}</div>
             ${allowBetting ? `
@@ -343,7 +355,8 @@ async function loadResolvedQuestions() {
       .map(question => renderQuestionCard(question, {
         allowBetting: false,
         showDeleteButton: Boolean(currentUser?.is_admin),
-        deleteScope: 'resolved'
+        deleteScope: 'resolved',
+        showCurrentUserPosition: !currentUser?.is_admin
       }))
       .join('');
   } catch (error) {

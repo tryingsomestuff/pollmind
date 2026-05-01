@@ -89,7 +89,7 @@ function calculateLMSRProbabilities(quantities, liquidity) {
   return scaledQuantities.map(quantity => Math.exp(quantity - denominator));
 }
 
-function buildQuestionMarketOptions(questionId, liquidity) {
+function buildQuestionMarketOptions(questionId, liquidity, userId = null) {
   const options = query('SELECT * FROM options WHERE question_id = ?', [questionId]);
   const optionStats = options.map(option => {
     const stats = queryOne(
@@ -97,10 +97,20 @@ function buildQuestionMarketOptions(questionId, liquidity) {
       [option.id]
     );
 
+    const userStats = userId
+      ? queryOne(
+        'SELECT SUM(amount) as user_amount, SUM(shares) as user_shares, COUNT(*) as user_bet_count FROM bets WHERE option_id = ? AND user_id = ?',
+        [option.id, userId]
+      )
+      : null;
+
     return {
       ...option,
       total_shares: stats?.total_shares || 0,
-      bet_count: stats?.bet_count || 0
+      bet_count: stats?.bet_count || 0,
+      user_amount: userStats?.user_amount || 0,
+      user_shares: userStats?.user_shares || 0,
+      user_bet_count: userStats?.user_bet_count || 0
     };
   });
 
@@ -353,7 +363,7 @@ app.get('/api/questions', authenticateToken, (req, res) => {
 
     const questionsWithDetails = questions.map(q => {
       const liquidity = Number(q.liquidity_param) || DEFAULT_LMSR_LIQUIDITY;
-      const optionsWithStats = buildQuestionMarketOptions(q.id, liquidity);
+      const optionsWithStats = buildQuestionMarketOptions(q.id, liquidity, req.user.id);
 
       return { ...q, options: optionsWithStats };
     });
@@ -377,7 +387,7 @@ app.get('/api/questions/:id', authenticateToken, (req, res) => {
     }
 
     const liquidity = Number(question.liquidity_param) || DEFAULT_LMSR_LIQUIDITY;
-    const options = buildQuestionMarketOptions(questionId, liquidity);
+    const options = buildQuestionMarketOptions(questionId, liquidity, req.user.id);
 
     res.json({ ...question, options });
   } catch (error) {
