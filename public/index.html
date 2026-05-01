@@ -88,6 +88,15 @@
       <!-- Onglet Admin -->
       <div id="tab-admin" class="tab-content">
         <h2>Administration</h2>
+
+        <div class="admin-section">
+          <h3>Gestion des comptes</h3>
+          <div class="admin-actions">
+            <button onclick="resetAdminPoints()" class="btn-secondary">Remettre mon compte admin a 1000</button>
+            <button onclick="resetAllUsersPoints()" class="btn-secondary">Remettre tous les utilisateurs a 100</button>
+          </div>
+          <div id="admin-users-list"></div>
+        </div>
         
         <div class="admin-section">
           <h3>Créer une nouvelle question</h3>
@@ -105,7 +114,7 @@
         </div>
 
         <div class="admin-section">
-          <h3>Questions à résoudre</h3>
+          <h3>Questions a gerer</h3>
           <div id="questions-to-resolve"></div>
         </div>
       </div>

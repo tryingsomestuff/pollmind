@@ -591,40 +591,166 @@ async function createQuestion() {
 
 async function loadAdminData() {
   try {
-    const response = await fetch(`${API_URL}/questions`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
+    const [questionsResponse, usersResponse] = await Promise.all([
+      fetch(`${API_URL}/questions`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      }),
+      fetch(`${API_URL}/admin/users`, {
+        headers: { 'Authorization': `Bearer ${authToken}` }
+      })
+    ]);
 
-    const questions = await response.json();
-    const openQuestions = questions.filter(q => q.status === 'open');
+    const questions = await questionsResponse.json();
+    const users = await usersResponse.json();
+
+    const usersContainer = document.getElementById('admin-users-list');
+    if (users.length === 0) {
+      usersContainer.innerHTML = '<p style="color: var(--text-secondary);">Aucun utilisateur</p>';
+    } else {
+      usersContainer.innerHTML = `
+        <div class="admin-users-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Utilisateur</th>
+                <th>Role</th>
+                <th>Points</th>
+                <th>Creation</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users.map(user => `
+                <tr>
+                  <td>${user.username}${user.id === currentUser.id ? ' (Vous)' : ''}</td>
+                  <td><span class="user-role ${user.is_admin ? 'user-role-admin' : 'user-role-user'}">${user.is_admin ? 'Admin' : 'Utilisateur'}</span></td>
+                  <td><strong>${user.points.toFixed(2)}</strong></td>
+                  <td>${formatDate(user.created_at)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
 
     const container = document.getElementById('questions-to-resolve');
-    
-    if (openQuestions.length === 0) {
-      container.innerHTML = '<p style="color: var(--text-secondary);">Aucune question à résoudre</p>';
+
+    if (questions.length === 0) {
+      container.innerHTML = '<p style="color: var(--text-secondary);">Aucune question</p>';
       return;
     }
 
-    container.innerHTML = openQuestions.map(question => `
+    container.innerHTML = questions.map(question => `
       <div class="question-card">
         <div class="question-title">${question.title}</div>
+        <div class="question-meta">Statut: ${question.status === 'open' ? 'Ouverte' : 'Resolue'} • ${question.options.length} options</div>
         <div class="options-grid">
           ${question.options.map(option => `
-            <div class="option-item">
+            <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
               <div class="option-info">
                 <div class="option-text">${option.text}</div>
                 <div class="option-stats">${option.bet_count} paris • ${option.total_shares.toFixed(2)} shares en circulation</div>
               </div>
-              <button class="btn-resolve" onclick="resolveQuestion(${question.id}, ${option.id})">
-                Marquer comme correct
-              </button>
+              ${question.status === 'open' ? `
+                <button class="btn-resolve" onclick="resolveQuestion(${question.id}, ${option.id})">
+                  Marquer comme correct
+                </button>
+              ` : ''}
             </div>
           `).join('')}
+        </div>
+        <div class="question-admin-actions">
+          <button class="btn-danger" onclick="deleteQuestion(${question.id}, '${question.status}')">Supprimer la question</button>
         </div>
       </div>
     `).join('');
   } catch (error) {
     console.error('Erreur chargement admin:', error);
+  }
+}
+
+async function resetAdminPoints() {
+  if (!confirm('Remettre votre compte admin a 1000 points ?')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/admin/reset-my-points`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      await Promise.all([refreshProfile(), loadAdminData(), loadLeaderboard()]);
+      alert(data.message);
+    } else {
+      alert(data.error || 'Erreur lors de la remise a 1000');
+    }
+  } catch (error) {
+    console.error('Erreur reset admin:', error);
+    alert('Erreur de connexion au serveur');
+  }
+}
+
+async function resetAllUsersPoints() {
+  if (!confirm('Remettre tous les utilisateurs non admin a 100 points ?')) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/admin/reset-users-points`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      await Promise.all([loadAdminData(), loadLeaderboard()]);
+      alert(data.message);
+    } else {
+      alert(data.error || 'Erreur lors de la remise a 100');
+    }
+  } catch (error) {
+    console.error('Erreur reset utilisateurs:', error);
+    alert('Erreur de connexion au serveur');
+  }
+}
+
+async function deleteQuestion(questionId, status) {
+  const confirmationMessage = status === 'open'
+    ? 'Supprimer cette question ouverte ? Les mises en cours seront remboursees.'
+    : 'Supprimer cette question resolue ? Cette suppression ne modifiera pas les points deja distribues.';
+
+  if (!confirm(confirmationMessage)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/questions/${questionId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      await Promise.all([
+        refreshProfile(),
+        loadAdminData(),
+        loadQuestions(),
+        loadMyBets(),
+        loadLeaderboard()
+      ]);
+      alert(data.message);
+    } else {
+      alert(data.error || 'Erreur lors de la suppression');
+    }
+  } catch (error) {
+    console.error('Erreur suppression question:', error);
+    alert('Erreur de connexion au serveur');
   }
 }
 

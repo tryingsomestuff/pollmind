@@ -189,6 +189,39 @@ app.post('/api/daily-bonus', authenticateToken, (req, res) => {
   }
 });
 
+// ========== ROUTES ADMINISTRATION ===========
+
+app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const users = query('SELECT id, username, is_admin, points, created_at FROM users ORDER BY is_admin DESC, username ASC');
+    res.json(users);
+  } catch (error) {
+    console.error('Erreur liste utilisateurs:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.post('/api/admin/reset-my-points', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    run('UPDATE users SET points = 1000 WHERE id = ?', [req.user.id]);
+    res.json({ message: 'Compte admin remis a 1000 points', newBalance: 1000 });
+  } catch (error) {
+    console.error('Erreur reset admin:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.post('/api/admin/reset-users-points', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    run('UPDATE users SET points = 100 WHERE is_admin = 0');
+    const updatedCount = queryOne('SELECT COUNT(*) as count FROM users WHERE is_admin = 0')?.count || 0;
+    res.json({ message: 'Tous les utilisateurs ont ete remis a 100 points', updatedCount });
+  } catch (error) {
+    console.error('Erreur reset utilisateurs:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // ========== ROUTES QUESTIONS ==========
 
 // Créer une question (admin seulement)
@@ -293,6 +326,40 @@ app.post('/api/questions/:id/resolve', authenticateToken, requireAdmin, (req, re
     res.json({ message: 'Question résolue', payoutSummary });
   } catch (error) {
     res.status(500).json({ error: 'Erreur résolution question' });
+  }
+});
+
+app.delete('/api/questions/:id', authenticateToken, requireAdmin, (req, res) => {
+  const questionId = req.params.id;
+
+  try {
+    const question = queryOne('SELECT id, status FROM questions WHERE id = ?', [questionId]);
+
+    if (!question) {
+      return res.status(404).json({ error: 'Question non trouvee' });
+    }
+
+    if (question.status === 'open') {
+      const bets = query('SELECT user_id, amount FROM bets WHERE question_id = ?', [questionId]);
+
+      bets.forEach(bet => {
+        run('UPDATE users SET points = points + ? WHERE id = ?', [bet.amount, bet.user_id]);
+      });
+    }
+
+    run('DELETE FROM bets WHERE question_id = ?', [questionId]);
+    run('DELETE FROM options WHERE question_id = ?', [questionId]);
+    run('DELETE FROM questions WHERE id = ?', [questionId]);
+
+    res.json({
+      message: question.status === 'open'
+        ? 'Question supprimee et mises remboursees'
+        : 'Question supprimee',
+      refunded: question.status === 'open'
+    });
+  } catch (error) {
+    console.error('Erreur suppression question:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
