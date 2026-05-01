@@ -1,5 +1,5 @@
 // Configuration
-// Détecte automatiquement le chemin de base (fonctionne avec /pollmind/ ou en direct)
+// Automatically detect the base path (works with /pollmind/ or direct hosting)
 const pathParts = window.location.pathname.split('/').filter(p => p);
 const BASE_PATH = pathParts[0] === 'pollmind' ? '/pollmind' : '';
 const API_URL = `${BASE_PATH}/api`;
@@ -13,8 +13,8 @@ function applyTheme(theme) {
   if (themeToggle) {
     const isDark = theme === 'dark';
     themeToggle.textContent = isDark ? '☀️' : '🌙';
-    themeToggle.setAttribute('aria-label', isDark ? 'Passer au theme clair' : 'Passer au theme sombre');
-    themeToggle.setAttribute('title', isDark ? 'Passer au theme clair' : 'Passer au theme sombre');
+    themeToggle.setAttribute('aria-label', isDark ? 'Switch to light theme' : 'Switch to dark theme');
+    themeToggle.setAttribute('title', isDark ? 'Switch to light theme' : 'Switch to dark theme');
   }
 }
 
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTheme(theme);
 });
 
-// ========== AUTHENTIFICATION ==========
+// ========== AUTHENTICATION ==========
 
 function showLogin() {
   document.getElementById('login-form').style.display = 'block';
@@ -48,12 +48,12 @@ async function register() {
   const confirmPassword = document.getElementById('register-password-confirm').value;
 
   if (!username || !password) {
-    alert('Veuillez remplir tous les champs');
+    alert('Please fill in all fields');
     return;
   }
 
   if (password !== confirmPassword) {
-    alert('Les mots de passe ne correspondent pas');
+    alert('Passwords do not match');
     return;
   }
 
@@ -67,16 +67,16 @@ async function register() {
     const data = await response.json();
 
     if (response.ok) {
-      alert('Inscription réussie ! Vous pouvez maintenant vous connecter.');
+      alert('Registration successful. You can now sign in.');
       showLogin();
       document.getElementById('register-username').value = '';
       document.getElementById('register-password').value = '';
       document.getElementById('register-password-confirm').value = '';
     } else {
-      alert(data.error || 'Erreur lors de l\'inscription');
+      alert(data.error || 'Registration failed');
     }
   } catch (error) {
-    alert('Erreur de connexion au serveur');
+    alert('Unable to connect to the server');
     console.error(error);
   }
 }
@@ -86,7 +86,7 @@ async function login() {
   const password = document.getElementById('login-password').value;
 
   if (!username || !password) {
-    alert('Veuillez remplir tous les champs');
+    alert('Please fill in all fields');
     return;
   }
 
@@ -106,10 +106,10 @@ async function login() {
       localStorage.setItem('currentUser', JSON.stringify(currentUser));
       showMainSection();
     } else {
-      alert(data.error || 'Identifiants incorrects');
+      alert(data.error || 'Incorrect credentials');
     }
   } catch (error) {
-    alert('Erreur de connexion au serveur');
+    alert('Unable to connect to the server');
     console.error(error);
   }
 }
@@ -140,7 +140,7 @@ function showMainSection() {
 // ========== NAVIGATION ==========
 
 function showTab(tabName) {
-  // Cacher tous les onglets
+  // Hide all tabs
   document.querySelectorAll('.tab-content').forEach(tab => {
     tab.classList.remove('active');
   });
@@ -148,11 +148,11 @@ function showTab(tabName) {
     btn.classList.remove('active');
   });
 
-  // Afficher l'onglet sélectionné
+  // Show the selected tab
   document.getElementById(`tab-${tabName}`).classList.add('active');
   document.getElementById(`nav-${tabName}`).classList.add('active');
 
-  // Charger les données correspondantes
+  // Load the matching data
   if (tabName === 'questions') {
     loadQuestions();
   } else if (tabName === 'my-bets') {
@@ -180,7 +180,7 @@ async function loadQuestions() {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">📊</div>
-          <div class="empty-state-text">Aucune question disponible pour le moment</div>
+          <div class="empty-state-text">No questions are available right now</div>
         </div>
       `;
       return;
@@ -193,9 +193,9 @@ async function loadQuestions() {
           <div class="question-header">
             <div class="question-title">
               ${question.title}
-              <span class="status-badge status-${question.status}">${question.status === 'open' ? 'Ouvert' : 'Résolu'}</span>
+              <span class="status-badge status-${question.status}">${question.status === 'open' ? 'Open' : 'Resolved'}</span>
             </div>
-            <div class="question-meta">Par ${question.creator_name} • ${formatDate(question.created_at)}</div>
+            <div class="question-meta">By ${question.creator_name} • ${formatDate(question.created_at)}</div>
           </div>
           ${question.description ? `<div class="question-description">${question.description}</div>` : ''}
           <div class="options-grid">
@@ -210,7 +210,7 @@ async function loadQuestions() {
                   <div class="option-price">${(price * 100).toFixed(0)}%</div>
                   ${question.status === 'open' ? `
                     <button class="btn-bet" onclick="openBetModal(${question.id}, ${option.id}, '${option.text}', '${question.title}')">
-                      Parier
+                      Bet
                     </button>
                   ` : ''}
                 </div>
@@ -220,10 +220,10 @@ async function loadQuestions() {
         </div>
       `).join('');
 
-    // Rafraîchir le profil pour avoir les points à jour
+    // Refresh the profile to keep points in sync
     await refreshProfile();
   } catch (error) {
-    console.error('Erreur chargement questions:', error);
+    console.error('Error loading questions:', error);
   }
 }
 
@@ -233,7 +233,7 @@ function calculatePrice(totalShares) {
   return Math.min(0.95, Math.max(0.05, basePrice + priceImpact));
 }
 
-// ========== PARIS ==========
+// ========== BETS ==========
 
 let currentBet = null;
 
@@ -245,19 +245,19 @@ function openBetModal(questionId, optionId, optionText, questionTitle) {
   
   content.innerHTML = `
     <p><strong>Question:</strong> ${questionTitle}</p>
-    <p><strong>Votre choix:</strong> ${optionText}</p>
-    <p><strong>Points disponibles:</strong> ${currentUser.points.toFixed(2)}</p>
+    <p><strong>Your choice:</strong> ${optionText}</p>
+    <p><strong>Available points:</strong> ${currentUser.points.toFixed(2)}</p>
     
-    <input type="number" id="bet-amount" class="bet-amount-input" placeholder="Points a miser" min="0.1" step="0.1" />
+    <input type="number" id="bet-amount" class="bet-amount-input" placeholder="Points to spend" min="0.1" step="0.1" />
     
     <div class="bet-info" id="bet-calculation"></div>
     
-    <button class="btn-primary" onclick="placeBet()">Confirmer le pari</button>
+    <button class="btn-primary" onclick="placeBet()">Confirm bet</button>
   `;
   
   modal.style.display = 'block';
   
-  // Ajouter un événement pour calculer en temps réel
+  // Add a live preview handler
   document.getElementById('bet-amount').addEventListener('input', calculateBetPreview);
 }
 
@@ -283,17 +283,17 @@ async function changePassword() {
   const confirmNewPassword = document.getElementById('confirm-new-password').value;
 
   if (!currentPassword || !newPassword || !confirmNewPassword) {
-    alert('Veuillez remplir tous les champs');
+    alert('Please fill in all fields');
     return;
   }
 
   if (newPassword.length < 6) {
-    alert('Le nouveau mot de passe doit contenir au moins 6 caracteres');
+    alert('The new password must be at least 6 characters long');
     return;
   }
 
   if (newPassword !== confirmNewPassword) {
-    alert('La confirmation du nouveau mot de passe ne correspond pas');
+    alert('The new password confirmation does not match');
     return;
   }
 
@@ -311,13 +311,13 @@ async function changePassword() {
 
     if (response.ok) {
       closePasswordModal();
-      alert('Mot de passe mis a jour avec succes');
+      alert('Password updated successfully');
     } else {
-      alert(data.error || 'Erreur lors du changement de mot de passe');
+      alert(data.error || 'Failed to update password');
     }
   } catch (error) {
-    console.error('Erreur changement mot de passe:', error);
-    alert('Erreur de connexion au serveur');
+    console.error('Error changing password:', error);
+    alert('Unable to connect to the server');
   }
 }
 
@@ -331,7 +331,7 @@ async function calculateBetPreview() {
   }
   
   if (amount > currentUser.points) {
-    calcDiv.innerHTML = '<p style="color: var(--danger-color)">⚠️ Points insuffisants</p>';
+    calcDiv.innerHTML = '<p style="color: var(--danger-color)">⚠️ Not enough points</p>';
     return;
   }
   
@@ -343,7 +343,7 @@ async function calculateBetPreview() {
     const question = await response.json();
     const option = question.options.find(o => o.id === currentBet.optionId);
     
-    // Récupérer les stats actuelles
+    // Fetch current stats
     const statsResponse = await fetch(`${API_URL}/questions`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
@@ -355,15 +355,15 @@ async function calculateBetPreview() {
     const shares = amount / price;
     
     calcDiv.innerHTML = `
-      <p><strong>Mise:</strong> ${amount.toFixed(2)} points</p>
-      <p><strong>Prix actuel d'une share:</strong> ${price.toFixed(2)} point</p>
-      <p><strong>Shares reçues:</strong> ${shares.toFixed(4)}</p>
+      <p><strong>Stake:</strong> ${amount.toFixed(2)} points</p>
+      <p><strong>Current share price:</strong> ${price.toFixed(2)} point</p>
+      <p><strong>Shares received:</strong> ${shares.toFixed(4)}</p>
       <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 10px;">
-        Les points que vous depensez maintenant sont convertis en shares. Si cette option gagne, vous recuperez une part du pool total proportionnelle a vos shares.
+        The points you spend now are converted into shares. If this option wins, you receive a portion of the total pool proportional to your shares.
       </p>
     `;
   } catch (error) {
-    console.error('Erreur calcul:', error);
+    console.error('Error calculating preview:', error);
   }
 }
 
@@ -371,12 +371,12 @@ async function placeBet() {
   const amount = parseFloat(document.getElementById('bet-amount').value);
   
   if (!amount || amount <= 0) {
-    alert('Veuillez entrer un montant valide');
+    alert('Please enter a valid amount');
     return;
   }
   
   if (amount > currentUser.points) {
-    alert('Points insuffisants');
+    alert('Not enough points');
     return;
   }
   
@@ -397,20 +397,20 @@ async function placeBet() {
     const data = await response.json();
     
     if (response.ok) {
-      alert(`Pari enregistre ! Vous avez mise ${amount.toFixed(2)} points et recu ${data.shares.toFixed(4)} shares au prix de ${data.price.toFixed(2)} point par share.`);
+      alert(`Bet placed. You spent ${amount.toFixed(2)} points and received ${data.shares.toFixed(4)} shares at ${data.price.toFixed(2)} point per share.`);
       closeBetModal();
       await refreshProfile();
       loadQuestions();
     } else {
-      alert(data.error || 'Erreur lors du pari');
+      alert(data.error || 'Failed to place bet');
     }
   } catch (error) {
-    alert('Erreur de connexion au serveur');
+    alert('Unable to connect to the server');
     console.error(error);
   }
 }
 
-// ========== MES PARIS ==========
+// ========== MY BETS ==========
 
 async function loadMyBets() {
   try {
@@ -426,7 +426,7 @@ async function loadMyBets() {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🎲</div>
-          <div class="empty-state-text">Vous n'avez pas encore placé de paris</div>
+          <div class="empty-state-text">You have not placed any bets yet</div>
         </div>
       `;
       return;
@@ -434,17 +434,17 @@ async function loadMyBets() {
 
     container.innerHTML = bets.map(bet => {
       let statusClass = 'bet-status-pending';
-      let statusText = 'En cours';
-      let amountLabel = `-${bet.amount.toFixed(2)} pts mises`;
+      let statusText = 'Open';
+      let amountLabel = `-${bet.amount.toFixed(2)} pts staked`;
       
       if (bet.question_status === 'resolved') {
         if (bet.is_winner) {
           statusClass = 'bet-status-won';
-          statusText = 'Gagne';
-          amountLabel = `+${bet.payout.toFixed(2)} pts recuperes`;
+          statusText = 'Won';
+          amountLabel = `+${bet.payout.toFixed(2)} pts paid out`;
         } else {
           statusClass = 'bet-status-lost';
-          statusText = 'Perdu';
+          statusText = 'Lost';
         }
       }
       
@@ -455,10 +455,10 @@ async function loadMyBets() {
             <div class="bet-amount">${amountLabel}</div>
           </div>
           <div class="bet-details">
-            <p><strong>Votre pari:</strong> ${bet.option_text}</p>
-            <p><strong>Mise initiale:</strong> ${bet.amount.toFixed(2)} points</p>
-            <p><strong>Prix d'achat:</strong> ${bet.price.toFixed(2)} point par share • <strong>Shares achetees:</strong> ${bet.shares.toFixed(4)}</p>
-            ${bet.is_winner ? `<p><strong>Paiement recu a la resolution:</strong> ${bet.payout.toFixed(2)} points</p>` : ''}
+            <p><strong>Your pick:</strong> ${bet.option_text}</p>
+            <p><strong>Original stake:</strong> ${bet.amount.toFixed(2)} points</p>
+            <p><strong>Purchase price:</strong> ${bet.price.toFixed(2)} point per share • <strong>Shares bought:</strong> ${bet.shares.toFixed(4)}</p>
+            ${bet.is_winner ? `<p><strong>Payout at resolution:</strong> ${bet.payout.toFixed(2)} points</p>` : ''}
             <p><strong>Date:</strong> ${formatDate(bet.created_at)}</p>
             <span class="bet-status ${statusClass}">${statusText}</span>
           </div>
@@ -466,11 +466,11 @@ async function loadMyBets() {
       `;
     }).join('');
   } catch (error) {
-    console.error('Erreur chargement paris:', error);
+    console.error('Error loading bets:', error);
   }
 }
 
-// ========== CLASSEMENT ==========
+// ========== LEADERBOARD ==========
 
 async function loadLeaderboard() {
   try {
@@ -486,7 +486,7 @@ async function loadLeaderboard() {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">🏆</div>
-          <div class="empty-state-text">Pas encore de classement</div>
+          <div class="empty-state-text">No leaderboard yet</div>
         </div>
       `;
       return;
@@ -497,8 +497,8 @@ async function loadLeaderboard() {
         <table>
           <thead>
             <tr>
-              <th>Rang</th>
-              <th>Utilisateur</th>
+              <th>Rank</th>
+              <th>User</th>
               <th>Points</th>
             </tr>
           </thead>
@@ -506,7 +506,7 @@ async function loadLeaderboard() {
             ${users.map((user, index) => `
               <tr>
                 <td><span class="rank rank-${index + 1}">${index + 1}</span></td>
-                <td>${user.username}${user.id === currentUser.id ? ' (Vous)' : ''}</td>
+                <td>${user.username}${user.id === currentUser.id ? ' (You)' : ''}</td>
                 <td><strong>${user.points.toFixed(2)}</strong></td>
               </tr>
             `).join('')}
@@ -515,7 +515,7 @@ async function loadLeaderboard() {
       </div>
     `;
   } catch (error) {
-    console.error('Erreur chargement classement:', error);
+    console.error('Error loading leaderboard:', error);
   }
 }
 
@@ -539,7 +539,7 @@ async function createQuestion() {
   const description = document.getElementById('new-question-description').value;
   
   if (!title) {
-    alert('Veuillez entrer un titre');
+    alert('Please enter a title');
     return;
   }
   
@@ -552,7 +552,7 @@ async function createQuestion() {
   }
   
   if (options.length < 2) {
-    alert('Veuillez entrer au moins 2 options');
+    alert('Please enter at least 2 options');
     return;
   }
   
@@ -569,9 +569,9 @@ async function createQuestion() {
     const data = await response.json();
     
     if (response.ok) {
-      alert('Question créée avec succès !');
+      alert('Question created successfully.');
       
-      // Réinitialiser le formulaire
+      // Reset the form
       document.getElementById('new-question-title').value = '';
       document.getElementById('new-question-description').value = '';
       for (let i = 1; i <= optionCount; i++) {
@@ -581,10 +581,10 @@ async function createQuestion() {
       
       loadAdminData();
     } else {
-      alert(data.error || 'Erreur création question');
+      alert(data.error || 'Failed to create question');
     }
   } catch (error) {
-    alert('Erreur de connexion au serveur');
+    alert('Unable to connect to the server');
     console.error(error);
   }
 }
@@ -605,24 +605,24 @@ async function loadAdminData() {
 
     const usersContainer = document.getElementById('admin-users-list');
     if (users.length === 0) {
-      usersContainer.innerHTML = '<p style="color: var(--text-secondary);">Aucun utilisateur</p>';
+      usersContainer.innerHTML = '<p style="color: var(--text-secondary);">No users found</p>';
     } else {
       usersContainer.innerHTML = `
         <div class="admin-users-table">
           <table>
             <thead>
               <tr>
-                <th>Utilisateur</th>
+                <th>User</th>
                 <th>Role</th>
                 <th>Points</th>
-                <th>Creation</th>
+                <th>Created</th>
               </tr>
             </thead>
             <tbody>
               ${users.map(user => `
                 <tr>
-                  <td>${user.username}${user.id === currentUser.id ? ' (Vous)' : ''}</td>
-                  <td><span class="user-role ${user.is_admin ? 'user-role-admin' : 'user-role-user'}">${user.is_admin ? 'Admin' : 'Utilisateur'}</span></td>
+                  <td>${user.username}${user.id === currentUser.id ? ' (You)' : ''}</td>
+                  <td><span class="user-role ${user.is_admin ? 'user-role-admin' : 'user-role-user'}">${user.is_admin ? 'Admin' : 'User'}</span></td>
                   <td><strong>${user.points.toFixed(2)}</strong></td>
                   <td>${formatDate(user.created_at)}</td>
                 </tr>
@@ -636,14 +636,14 @@ async function loadAdminData() {
     const container = document.getElementById('questions-to-resolve');
 
     if (questions.length === 0) {
-      container.innerHTML = '<p style="color: var(--text-secondary);">Aucune question</p>';
+      container.innerHTML = '<p style="color: var(--text-secondary);">No questions</p>';
       return;
     }
 
     container.innerHTML = questions.map(question => `
       <div class="question-card">
         <div class="question-title">${question.title}</div>
-        <div class="question-meta">Statut: ${question.status === 'open' ? 'Ouverte' : 'Resolue'} • ${question.options.length} options</div>
+        <div class="question-meta">Status: ${question.status === 'open' ? 'Open' : 'Resolved'} • ${question.options.length} options</div>
         <div class="options-grid">
           ${question.options.map(option => `
             <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
@@ -653,24 +653,24 @@ async function loadAdminData() {
               </div>
               ${question.status === 'open' ? `
                 <button class="btn-resolve" onclick="resolveQuestion(${question.id}, ${option.id})">
-                  Marquer comme correct
+                  Mark as correct
                 </button>
               ` : ''}
             </div>
           `).join('')}
         </div>
         <div class="question-admin-actions">
-          <button class="btn-danger" onclick="deleteQuestion(${question.id}, '${question.status}')">Supprimer la question</button>
+          <button class="btn-danger" onclick="deleteQuestion(${question.id}, '${question.status}')">Delete question</button>
         </div>
       </div>
     `).join('');
   } catch (error) {
-    console.error('Erreur chargement admin:', error);
+    console.error('Error loading admin data:', error);
   }
 }
 
 async function resetAdminPoints() {
-  if (!confirm('Remettre votre compte admin a 1000 points ?')) {
+  if (!confirm('Reset your admin account to 1000 points?')) {
     return;
   }
 
@@ -686,16 +686,16 @@ async function resetAdminPoints() {
       await Promise.all([refreshProfile(), loadAdminData(), loadLeaderboard()]);
       alert(data.message);
     } else {
-      alert(data.error || 'Erreur lors de la remise a 1000');
+      alert(data.error || 'Failed to reset admin points');
     }
   } catch (error) {
-    console.error('Erreur reset admin:', error);
-    alert('Erreur de connexion au serveur');
+    console.error('Error resetting admin points:', error);
+    alert('Unable to connect to the server');
   }
 }
 
 async function resetAllUsersPoints() {
-  if (!confirm('Remettre tous les utilisateurs non admin a 100 points ?')) {
+  if (!confirm('Reset all non-admin users to 100 points?')) {
     return;
   }
 
@@ -711,18 +711,18 @@ async function resetAllUsersPoints() {
       await Promise.all([loadAdminData(), loadLeaderboard()]);
       alert(data.message);
     } else {
-      alert(data.error || 'Erreur lors de la remise a 100');
+      alert(data.error || 'Failed to reset user points');
     }
   } catch (error) {
-    console.error('Erreur reset utilisateurs:', error);
-    alert('Erreur de connexion au serveur');
+    console.error('Error resetting user points:', error);
+    alert('Unable to connect to the server');
   }
 }
 
 async function deleteQuestion(questionId, status) {
   const confirmationMessage = status === 'open'
-    ? 'Supprimer cette question ouverte ? Les mises en cours seront remboursees.'
-    : 'Supprimer cette question resolue ? Cette suppression ne modifiera pas les points deja distribues.';
+    ? 'Delete this open question? Current stakes will be refunded.'
+    : 'Delete this resolved question? This will not change points that were already distributed.';
 
   if (!confirm(confirmationMessage)) {
     return;
@@ -746,16 +746,16 @@ async function deleteQuestion(questionId, status) {
       ]);
       alert(data.message);
     } else {
-      alert(data.error || 'Erreur lors de la suppression');
+      alert(data.error || 'Failed to delete question');
     }
   } catch (error) {
-    console.error('Erreur suppression question:', error);
-    alert('Erreur de connexion au serveur');
+    console.error('Error deleting question:', error);
+    alert('Unable to connect to the server');
   }
 }
 
 async function resolveQuestion(questionId, optionId) {
-  if (!confirm('Êtes-vous sûr de vouloir résoudre cette question ? Cette action est irréversible.')) {
+  if (!confirm('Are you sure you want to resolve this question? This action cannot be undone.')) {
     return;
   }
   
@@ -772,7 +772,7 @@ async function resolveQuestion(questionId, optionId) {
     const data = await response.json();
     
     if (response.ok) {
-      alert('Question résolue ! Les gains ont été distribués.');
+      alert('Question resolved. Winnings have been distributed.');
       await Promise.all([
         refreshProfile(),
         loadAdminData(),
@@ -781,10 +781,10 @@ async function resolveQuestion(questionId, optionId) {
         loadLeaderboard()
       ]);
     } else {
-      alert(data.error || 'Erreur résolution question');
+      alert(data.error || 'Failed to resolve question');
     }
   } catch (error) {
-    alert('Erreur de connexion au serveur');
+    alert('Unable to connect to the server');
     console.error(error);
   }
 }
@@ -804,11 +804,11 @@ async function refreshProfile() {
       document.getElementById('user-points').textContent = `${currentUser.points.toFixed(2)} points`;
     }
   } catch (error) {
-    console.error('Erreur refresh profil:', error);
+    console.error('Error refreshing profile:', error);
   }
 }
 
-// Réclamer le bonus journalier
+// Claim the daily bonus
 async function claimDailyBonus() {
   try {
     const response = await fetch(`${API_URL}/daily-bonus`, {
@@ -825,14 +825,14 @@ async function claimDailyBonus() {
         alert(`⏰ ${data.message}\n${data.nextBonus}`);
       } else {
         alert(`🎁 ${data.message}\n+${data.bonus} points!`);
-        await refreshProfile(); // Rafraîchir pour montrer les nouveaux points
+        await refreshProfile(); // Refresh to display the new points
       }
     } else {
-      alert('Erreur: ' + (data.error || 'Impossible de réclamer le bonus'));
+      alert('Error: ' + (data.error || 'Unable to claim the bonus'));
     }
   } catch (error) {
-    console.error('Erreur lors de la réclamation du bonus:', error);
-    alert('Erreur lors de la réclamation du bonus');
+    console.error('Error while claiming the bonus:', error);
+    alert('Error while claiming the bonus');
   }
 }
 
@@ -846,12 +846,12 @@ function formatDate(dateString) {
   const hours = Math.floor(diff / 3600000);
   const days = Math.floor(diff / 86400000);
   
-  if (minutes < 1) return 'À l\'instant';
-  if (minutes < 60) return `Il y a ${minutes} min`;
-  if (hours < 24) return `Il y a ${hours}h`;
-  if (days < 7) return `Il y a ${days}j`;
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
   
-  return date.toLocaleDateString('fr-FR');
+  return date.toLocaleDateString('en-GB');
 }
 
 // ========== INITIALISATION ==========
@@ -869,7 +869,7 @@ window.onclick = function(event) {
   }
 };
 
-// Vérifier si l'utilisateur est déjà connecté
+// Check whether the user is already signed in
 window.addEventListener('DOMContentLoaded', () => {
   const savedToken = localStorage.getItem('authToken');
   const savedUser = localStorage.getItem('currentUser');

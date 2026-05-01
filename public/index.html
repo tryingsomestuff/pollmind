@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PollMind - Marché de Prédiction</title>
+  <title>PollMind - Prediction Market</title>
   <script>
     (function() {
       const storedTheme = localStorage.getItem('pollmind-theme');
@@ -15,28 +15,28 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Changer de theme" title="Changer de theme">🌙</button>
+  <button id="theme-toggle" class="theme-toggle" type="button" onclick="toggleTheme()" aria-label="Change theme" title="Change theme">🌙</button>
   <!-- Section Authentification -->
   <div id="auth-section" class="container">
     <div class="auth-box">
       <h1>🧠 PollMind</h1>
-      <p class="subtitle">Marché de prédiction interne</p>
+      <p class="subtitle">Internal prediction market</p>
       
       <div id="login-form" class="form-container">
-        <h2>Connexion</h2>
-        <input type="text" id="login-username" placeholder="Nom d'utilisateur" />
-        <input type="password" id="login-password" placeholder="Mot de passe" />
-        <button onclick="login()">Se connecter</button>
-        <p class="form-switch">Pas de compte ? <a href="#" onclick="showRegister()">S'inscrire</a></p>
+        <h2>Sign In</h2>
+        <input type="text" id="login-username" placeholder="Username" />
+        <input type="password" id="login-password" placeholder="Password" />
+        <button onclick="login()">Sign in</button>
+        <p class="form-switch">No account yet? <a href="#" onclick="showRegister()">Create one</a></p>
       </div>
 
       <div id="register-form" class="form-container" style="display: none;">
-        <h2>Inscription</h2>
-        <input type="text" id="register-username" placeholder="Nom d'utilisateur" />
-        <input type="password" id="register-password" placeholder="Mot de passe" />
-        <input type="password" id="register-password-confirm" placeholder="Confirmer mot de passe" />
-        <button onclick="register()">S'inscrire</button>
-        <p class="form-switch">Déjà un compte ? <a href="#" onclick="showLogin()">Se connecter</a></p>
+        <h2>Register</h2>
+        <input type="text" id="register-username" placeholder="Username" />
+        <input type="password" id="register-password" placeholder="Password" />
+        <input type="password" id="register-password-confirm" placeholder="Confirm password" />
+        <button onclick="register()">Create account</button>
+        <p class="form-switch">Already have an account? <a href="#" onclick="showLogin()">Sign in</a></p>
       </div>
 
     </div>
@@ -52,15 +52,15 @@
           <div class="user-info">
             <span id="user-name"></span>
             <span class="points" id="user-points"></span>
-            <button onclick="claimDailyBonus()" class="btn-bonus" title="Réclamer votre bonus journalier de 10 points">🎁 Bonus</button>
-            <button onclick="openPasswordModal()" class="btn-secondary btn-password" title="Changer mon mot de passe">🔐 Mot de passe</button>
-            <button onclick="logout()" class="btn-secondary">Déconnexion</button>
+            <button onclick="claimDailyBonus()" class="btn-bonus" title="Claim your daily 10-point bonus">🎁 Bonus</button>
+            <button onclick="openPasswordModal()" class="btn-secondary btn-password" title="Change my password">🔐 Password</button>
+            <button onclick="logout()" class="btn-secondary">Sign out</button>
           </div>
         </div>
         <nav>
           <button onclick="showTab('questions')" class="nav-btn active" id="nav-questions">Questions</button>
-          <button onclick="showTab('my-bets')" class="nav-btn" id="nav-my-bets">Mes Paris</button>
-          <button onclick="showTab('leaderboard')" class="nav-btn" id="nav-leaderboard">Classement</button>
+          <button onclick="showTab('my-bets')" class="nav-btn" id="nav-my-bets">My Bets</button>
+          <button onclick="showTab('leaderboard')" class="nav-btn" id="nav-leaderboard">Leaderboard</button>
           <button onclick="showTab('admin')" class="nav-btn" id="nav-admin" style="display: none;">Admin</button>
         </nav>
       </div>
@@ -69,19 +69,19 @@
     <main class="container">
       <!-- Onglet Questions -->
       <div id="tab-questions" class="tab-content active">
-        <h2>Questions Ouvertes</h2>
+        <h2>Open Questions</h2>
         <div id="questions-list"></div>
       </div>
 
       <!-- Onglet Mes Paris -->
       <div id="tab-my-bets" class="tab-content">
-        <h2>Mes Paris</h2>
+        <h2>My Bets</h2>
         <div id="my-bets-list"></div>
       </div>
 
       <!-- Onglet Classement -->
       <div id="tab-leaderboard" class="tab-content">
-        <h2>Classement</h2>
+        <h2>Leaderboard</h2>
         <div id="leaderboard-list"></div>
       </div>
 
@@ -90,31 +90,31 @@
         <h2>Administration</h2>
 
         <div class="admin-section">
-          <h3>Gestion des comptes</h3>
+          <h3>Account Management</h3>
           <div class="admin-actions">
-            <button onclick="resetAdminPoints()" class="btn-secondary">Remettre mon compte admin a 1000</button>
-            <button onclick="resetAllUsersPoints()" class="btn-secondary">Remettre tous les utilisateurs a 100</button>
+            <button onclick="resetAdminPoints()" class="btn-secondary">Reset my admin account to 1000</button>
+            <button onclick="resetAllUsersPoints()" class="btn-secondary">Reset all users to 100</button>
           </div>
           <div id="admin-users-list"></div>
         </div>
         
         <div class="admin-section">
-          <h3>Créer une nouvelle question</h3>
-          <input type="text" id="new-question-title" placeholder="Titre de la question" class="full-width" />
-          <textarea id="new-question-description" placeholder="Description (optionnelle)" class="full-width"></textarea>
+          <h3>Create a New Question</h3>
+          <input type="text" id="new-question-title" placeholder="Question title" class="full-width" />
+          <textarea id="new-question-description" placeholder="Description (optional)" class="full-width"></textarea>
           
           <div id="options-container">
-            <h4>Options de réponse</h4>
+            <h4>Answer options</h4>
             <input type="text" id="option-1" placeholder="Option 1" class="option-input" />
             <input type="text" id="option-2" placeholder="Option 2" class="option-input" />
           </div>
           
-          <button onclick="addOption()" class="btn-secondary">+ Ajouter une option</button>
-          <button onclick="createQuestion()" class="btn-primary">Créer la question</button>
+          <button onclick="addOption()" class="btn-secondary">+ Add an option</button>
+          <button onclick="createQuestion()" class="btn-primary">Create question</button>
         </div>
 
         <div class="admin-section">
-          <h3>Questions a gerer</h3>
+          <h3>Manage Questions</h3>
           <div id="questions-to-resolve"></div>
         </div>
       </div>
@@ -125,7 +125,7 @@
   <div id="bet-modal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closeBetModal()">&times;</span>
-      <h2>Placer un pari</h2>
+      <h2>Place a Bet</h2>
       <div id="bet-modal-content"></div>
     </div>
   </div>
@@ -133,13 +133,13 @@
   <div id="password-modal" class="modal">
     <div class="modal-content">
       <span class="close" onclick="closePasswordModal()">&times;</span>
-      <h2>Changer mon mot de passe</h2>
+      <h2>Change My Password</h2>
       <div class="password-form">
-        <input type="password" id="current-password" class="full-width" placeholder="Mot de passe actuel" />
-        <input type="password" id="new-password" class="full-width" placeholder="Nouveau mot de passe" />
-        <input type="password" id="confirm-new-password" class="full-width" placeholder="Confirmer le nouveau mot de passe" />
-        <p class="form-hint">Minimum 6 caracteres.</p>
-        <button onclick="changePassword()" class="btn-primary">Mettre a jour le mot de passe</button>
+        <input type="password" id="current-password" class="full-width" placeholder="Current password" />
+        <input type="password" id="new-password" class="full-width" placeholder="New password" />
+        <input type="password" id="confirm-new-password" class="full-width" placeholder="Confirm new password" />
+        <p class="form-hint">Minimum 6 characters.</p>
+        <button onclick="changePassword()" class="btn-primary">Update password</button>
       </div>
     </div>
   </div>

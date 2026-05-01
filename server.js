@@ -14,9 +14,9 @@ let dbReady = false;
 // Initialiser la base de données avant de démarrer
 initDatabase().then(() => {
   dbReady = true;
-  console.log('✓ Base de données prête');
+  console.log('✓ Database ready');
 }).catch(err => {
-  console.error('Erreur initialisation DB:', err);
+  console.error('Database initialization error:', err);
   process.exit(1);
 });
 
@@ -25,10 +25,10 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
-// Middleware pour vérifier que la DB est prête
+// Middleware to ensure the DB is ready
 app.use((req, res, next) => {
   if (!dbReady) {
-    return res.status(503).json({ error: 'Base de données en cours d\'initialisation' });
+    return res.status(503).json({ error: 'Database is still initializing' });
   }
   next();
 });
@@ -51,34 +51,34 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Middleware admin
+// Admin middleware
 const requireAdmin = (req, res, next) => {
   if (!req.user.is_admin) {
-    return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
+    return res.status(403).json({ error: 'Admin access only' });
   }
   next();
 };
 
-// ========== ROUTES AUTHENTIFICATION ==========
+// ========== AUTHENTICATION ROUTES ==========
 
 // Inscription
 app.post('/api/register', async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Username et password requis' });
+    return res.status(400).json({ error: 'Username and password are required' });
   }
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     run('INSERT INTO users (username, password) VALUES (?, ?)', [username, hashedPassword]);
     
-    res.json({ message: 'Inscription réussie' });
+    res.json({ message: 'Registration successful' });
   } catch (error) {
     if (error.message && error.message.includes('UNIQUE')) {
-      return res.status(400).json({ error: 'Nom d\'utilisateur déjà pris' });
+      return res.status(400).json({ error: 'Username is already taken' });
     }
-    res.status(500).json({ error: 'Erreur lors de l\'inscription' });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
@@ -90,13 +90,13 @@ app.post('/api/login', async (req, res) => {
     const user = queryOne('SELECT * FROM users WHERE username = ?', [username]);
 
     if (!user) {
-      return res.status(401).json({ error: 'Identifiants incorrects' });
+      return res.status(401).json({ error: 'Incorrect credentials' });
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
     
     if (!validPassword) {
-      return res.status(401).json({ error: 'Identifiants incorrects' });
+      return res.status(401).json({ error: 'Incorrect credentials' });
     }
 
     const token = jwt.sign({ id: user.id, username: user.username, is_admin: user.is_admin }, SECRET_KEY, { expiresIn: '24h' });
@@ -111,56 +111,56 @@ app.post('/api/login', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Profil utilisateur
+// User profile
 app.get('/api/profile', authenticateToken, (req, res) => {
   try {
     const user = queryOne('SELECT id, username, is_admin, points FROM users WHERE id = ?', [req.user.id]);
     res.json(user);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Changement de mot de passe
+// Change password
 app.post('/api/change-password', authenticateToken, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
   if (!currentPassword || !newPassword) {
-    return res.status(400).json({ error: 'Ancien et nouveau mot de passe requis' });
+    return res.status(400).json({ error: 'Current and new passwords are required' });
   }
 
   if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caracteres' });
+    return res.status(400).json({ error: 'The new password must be at least 6 characters long' });
   }
 
   try {
     const user = queryOne('SELECT id, password FROM users WHERE id = ?', [req.user.id]);
 
     if (!user) {
-      return res.status(404).json({ error: 'Utilisateur non trouve' });
+      return res.status(404).json({ error: 'User not found' });
     }
 
     const validPassword = await bcrypt.compare(currentPassword, user.password);
 
     if (!validPassword) {
-      return res.status(401).json({ error: 'Mot de passe actuel incorrect' });
+      return res.status(401).json({ error: 'Current password is incorrect' });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
 
-    res.json({ message: 'Mot de passe mis a jour' });
+    res.json({ message: 'Password updated' });
   } catch (error) {
-    console.error('Erreur changement mot de passe:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('Password change error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Bonus journalier
+// Daily bonus
 app.post('/api/daily-bonus', authenticateToken, (req, res) => {
   try {
     const user = queryOne('SELECT points, last_bonus_date FROM users WHERE id = ?', [req.user.id]);
@@ -172,42 +172,42 @@ app.post('/api/daily-bonus', authenticateToken, (req, res) => {
     if (lastBonus !== today) {
       run('UPDATE users SET points = points + 10, last_bonus_date = CURRENT_TIMESTAMP WHERE id = ?', [req.user.id]);
       res.json({ 
-        message: 'Bonus journalier reçu!', 
+        message: 'Daily bonus claimed!', 
         bonus: 10, 
         newBalance: user.points + 10 
       });
     } else {
       res.json({ 
-        message: 'Bonus déjà réclamé aujourd\'hui',
+        message: 'Daily bonus already claimed today',
         alreadyClaimed: true,
-        nextBonus: 'Revenez demain!'
+        nextBonus: 'Come back tomorrow!'
       });
     }
   } catch (error) {
-    console.error('Erreur bonus journalier:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('Daily bonus error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// ========== ROUTES ADMINISTRATION ===========
+// ========== ADMIN ROUTES ===========
 
 app.get('/api/admin/users', authenticateToken, requireAdmin, (req, res) => {
   try {
     const users = query('SELECT id, username, is_admin, points, created_at FROM users ORDER BY is_admin DESC, username ASC');
     res.json(users);
   } catch (error) {
-    console.error('Erreur liste utilisateurs:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('User list error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
 app.post('/api/admin/reset-my-points', authenticateToken, requireAdmin, (req, res) => {
   try {
     run('UPDATE users SET points = 1000 WHERE id = ?', [req.user.id]);
-    res.json({ message: 'Compte admin remis a 1000 points', newBalance: 1000 });
+    res.json({ message: 'Admin account reset to 1000 points', newBalance: 1000 });
   } catch (error) {
-    console.error('Erreur reset admin:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('Admin reset error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -215,21 +215,21 @@ app.post('/api/admin/reset-users-points', authenticateToken, requireAdmin, (req,
   try {
     run('UPDATE users SET points = 100 WHERE is_admin = 0');
     const updatedCount = queryOne('SELECT COUNT(*) as count FROM users WHERE is_admin = 0')?.count || 0;
-    res.json({ message: 'Tous les utilisateurs ont ete remis a 100 points', updatedCount });
+    res.json({ message: 'All users have been reset to 100 points', updatedCount });
   } catch (error) {
-    console.error('Erreur reset utilisateurs:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('User reset error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// ========== ROUTES QUESTIONS ==========
+// ========== QUESTION ROUTES ==========
 
-// Créer une question (admin seulement)
+// Create a question (admin only)
 app.post('/api/questions', authenticateToken, requireAdmin, (req, res) => {
   const { title, description, options } = req.body;
 
   if (!title || !options || options.length < 2) {
-    return res.status(400).json({ error: 'Titre et au moins 2 options requis' });
+    return res.status(400).json({ error: 'A title and at least 2 options are required' });
   }
 
   try {
@@ -242,13 +242,13 @@ app.post('/api/questions', authenticateToken, requireAdmin, (req, res) => {
       run('INSERT INTO options (question_id, text) VALUES (?, ?)', [questionId, option.text]);
     });
 
-    res.json({ message: 'Question créée avec succès', questionId });
+    res.json({ message: 'Question created successfully', questionId });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur création question' });
+    res.status(500).json({ error: 'Question creation failed' });
   }
 });
 
-// Lister toutes les questions
+// List all questions
 app.get('/api/questions', authenticateToken, (req, res) => {
   try {
     const questions = query('SELECT q.*, u.username as creator_name FROM questions q JOIN users u ON q.created_by = u.id ORDER BY q.created_at DESC');
@@ -271,12 +271,12 @@ app.get('/api/questions', authenticateToken, (req, res) => {
 
     res.json(questionsWithDetails);
   } catch (error) {
-    console.error('Erreur:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('Question list error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Détails d'une question
+// Question details
 app.get('/api/questions/:id', authenticateToken, (req, res) => {
   const questionId = req.params.id;
 
@@ -284,18 +284,18 @@ app.get('/api/questions/:id', authenticateToken, (req, res) => {
     const question = queryOne('SELECT * FROM questions WHERE id = ?', [questionId]);
 
     if (!question) {
-      return res.status(404).json({ error: 'Question non trouvée' });
+      return res.status(404).json({ error: 'Question not found' });
     }
 
     const options = query('SELECT * FROM options WHERE question_id = ?', [questionId]);
 
     res.json({ ...question, options });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Résoudre une question (admin seulement)
+// Resolve a question (admin only)
 app.post('/api/questions/:id/resolve', authenticateToken, requireAdmin, (req, res) => {
   const { optionId } = req.body;
   const questionId = req.params.id;
@@ -304,17 +304,17 @@ app.post('/api/questions/:id/resolve', authenticateToken, requireAdmin, (req, re
     const question = queryOne('SELECT id, status FROM questions WHERE id = ?', [questionId]);
 
     if (!question) {
-      return res.status(404).json({ error: 'Question non trouvée' });
+      return res.status(404).json({ error: 'Question not found' });
     }
 
     if (question.status !== 'open') {
-      return res.status(400).json({ error: 'Cette question est deja resolue' });
+      return res.status(400).json({ error: 'This question is already resolved' });
     }
 
     const option = queryOne('SELECT id FROM options WHERE id = ? AND question_id = ?', [optionId, questionId]);
 
     if (!option) {
-      return res.status(400).json({ error: 'Option invalide pour cette question' });
+      return res.status(400).json({ error: 'Invalid option for this question' });
     }
 
     run('UPDATE questions SET status = ?, resolution = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?', ['resolved', optionId, questionId]);
@@ -323,9 +323,9 @@ app.post('/api/questions/:id/resolve', authenticateToken, requireAdmin, (req, re
     // Redistribuer les gains
     const payoutSummary = distributeWinnings(questionId, optionId);
 
-    res.json({ message: 'Question résolue', payoutSummary });
+    res.json({ message: 'Question resolved', payoutSummary });
   } catch (error) {
-    res.status(500).json({ error: 'Erreur résolution question' });
+    res.status(500).json({ error: 'Question resolution failed' });
   }
 });
 
@@ -336,7 +336,7 @@ app.delete('/api/questions/:id', authenticateToken, requireAdmin, (req, res) => 
     const question = queryOne('SELECT id, status FROM questions WHERE id = ?', [questionId]);
 
     if (!question) {
-      return res.status(404).json({ error: 'Question non trouvee' });
+      return res.status(404).json({ error: 'Question not found' });
     }
 
     if (question.status === 'open') {
@@ -353,17 +353,17 @@ app.delete('/api/questions/:id', authenticateToken, requireAdmin, (req, res) => 
 
     res.json({
       message: question.status === 'open'
-        ? 'Question supprimee et mises remboursees'
-        : 'Question supprimee',
+        ? 'Question deleted and stakes refunded'
+        : 'Question deleted',
       refunded: question.status === 'open'
     });
   } catch (error) {
-    console.error('Erreur suppression question:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('Question deletion error:', error);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Fonction pour redistribuer les gains
+// Redistribute winnings
 function distributeWinnings(questionId, correctOptionId) {
   try {
     const winningBets = query('SELECT id, user_id, shares FROM bets WHERE question_id = ? AND option_id = ?', [questionId, correctOptionId]);
@@ -388,39 +388,39 @@ function distributeWinnings(questionId, correctOptionId) {
       winnerCount: winningBets.length
     };
   } catch (error) {
-    console.error('Erreur distribution gains:', error);
+    console.error('Winnings distribution error:', error);
     throw error;
   }
 }
 
-// ========== ROUTES PARIS ==========
+// ========== BET ROUTES ==========
 
-// Calculer le prix actuel
+// Calculate the current price
 function calculatePrice(totalShares) {
   const basePrice = 0.5;
   const priceImpact = totalShares * 0.01;
   return Math.min(0.95, Math.max(0.05, basePrice + priceImpact));
 }
 
-// Placer un pari
+// Place a bet
 app.post('/api/bets', authenticateToken, (req, res) => {
   const { questionId, optionId, amount } = req.body;
 
   if (!questionId || !optionId || !amount || amount <= 0) {
-    return res.status(400).json({ error: 'Données invalides' });
+    return res.status(400).json({ error: 'Invalid data' });
   }
 
   try {
     const question = queryOne('SELECT status FROM questions WHERE id = ?', [questionId]);
     
     if (!question || question.status !== 'open') {
-      return res.status(400).json({ error: 'Question fermée ou inexistante' });
+      return res.status(400).json({ error: 'Question is closed or does not exist' });
     }
 
     const user = queryOne('SELECT points FROM users WHERE id = ?', [req.user.id]);
     
     if (user.points < amount) {
-      return res.status(400).json({ error: 'Points insuffisants' });
+      return res.status(400).json({ error: 'Not enough points' });
     }
 
     const stats = queryOne('SELECT SUM(shares) as total_shares FROM bets WHERE option_id = ?', [optionId]);
@@ -432,14 +432,14 @@ app.post('/api/bets', authenticateToken, (req, res) => {
     run('UPDATE users SET points = points - ? WHERE id = ?', [amount, req.user.id]);
     run('INSERT INTO bets (user_id, question_id, option_id, amount, price, shares) VALUES (?, ?, ?, ?, ?, ?)', [req.user.id, questionId, optionId, amount, price, shares]);
 
-    res.json({ message: 'Pari enregistré', shares, price });
+    res.json({ message: 'Bet placed', shares, price });
   } catch (error) {
-    console.error('Erreur pari:', error);
-    res.status(500).json({ error: 'Erreur enregistrement pari' });
+    console.error('Bet error:', error);
+    res.status(500).json({ error: 'Bet placement failed' });
   }
 });
 
-// Historique des paris
+// Bet history
 app.get('/api/my-bets', authenticateToken, (req, res) => {
   try {
     const bets = query(
@@ -491,7 +491,7 @@ app.get('/api/my-bets', authenticateToken, (req, res) => {
 
     res.json(enrichedBets);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
@@ -501,12 +501,12 @@ app.get('/api/leaderboard', authenticateToken, (req, res) => {
     const users = query('SELECT id, username, points FROM users WHERE is_admin = 0 ORDER BY points DESC LIMIT 10');
     res.json(users);
   } catch (error) {
-    res.status(500).json({ error: 'Erreur serveur' });
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// ========== DÉMARRAGE SERVEUR ==========
+// ========== SERVER START ==========
 
 app.listen(PORT, () => {
-  console.log(`🚀 Serveur PollMind démarré sur http://localhost:\${PORT}`);
+  console.log(`🚀 PollMind server started on http://localhost:\${PORT}`);
 });
