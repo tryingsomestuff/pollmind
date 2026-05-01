@@ -231,6 +231,8 @@ function showTab(tabName) {
   // Load the matching data
   if (tabName === 'questions') {
     loadQuestions();
+  } else if (tabName === 'resolved-questions') {
+    loadResolvedQuestions();
   } else if (tabName === 'my-bets') {
     loadMyBets();
   } else if (tabName === 'leaderboard') {
@@ -242,6 +244,49 @@ function showTab(tabName) {
 
 // ========== QUESTIONS ==========
 
+function renderQuestionCard(question, options = {}) {
+  const {
+    allowBetting = false,
+    showDeleteButton = false,
+    deleteScope = 'resolved',
+    showResolvedBadge = true
+  } = options;
+
+  return `
+    <div class="question-card">
+      <div class="question-header">
+        <div class="question-title">
+          ${question.title}
+          ${showResolvedBadge ? `<span class="status-badge status-${question.status}">${question.status === 'open' ? 'Open' : 'Resolved'}</span>` : ''}
+        </div>
+        <div class="question-meta">By ${question.creator_name} • ${formatDate(question.created_at)}</div>
+      </div>
+      ${question.description ? `<div class="question-description">${question.description}</div>` : ''}
+      <div class="options-grid">
+        ${question.options.map(option => `
+          <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
+            <div class="option-info">
+              <div class="option-text">${option.text}</div>
+              <div class="option-stats">${option.bet_count} bets • ${option.total_shares.toFixed(2)} shares outstanding</div>
+            </div>
+            <div class="option-price">${formatProbability(option.probability || 0)}</div>
+            ${allowBetting ? `
+              <button class="btn-bet" onclick="openBetModal(${question.id}, ${option.id}, '${option.text}', '${question.title}')">
+                Bet
+              </button>
+            ` : ''}
+          </div>
+        `).join('')}
+      </div>
+      ${showDeleteButton ? `
+        <div class="question-admin-actions">
+          <button class="btn-danger" onclick="deleteQuestion(${question.id}, '${deleteScope}')">Delete question</button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
 async function loadQuestions() {
   try {
     const response = await fetch(`${API_URL}/questions`, {
@@ -251,55 +296,58 @@ async function loadQuestions() {
     const questions = await response.json();
 
     const container = document.getElementById('questions-list');
+    const openQuestions = questions.filter(q => q.status === 'open');
     
-    if (questions.length === 0) {
+    if (openQuestions.length === 0) {
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">📊</div>
-          <div class="empty-state-text">No questions are available right now</div>
+          <div class="empty-state-text">No open questions are available right now</div>
         </div>
       `;
       return;
     }
 
-    container.innerHTML = questions
-      .filter(q => q.status === 'open')
-      .map(question => `
-        <div class="question-card">
-          <div class="question-header">
-            <div class="question-title">
-              ${question.title}
-              <span class="status-badge status-${question.status}">${question.status === 'open' ? 'Open' : 'Resolved'}</span>
-            </div>
-            <div class="question-meta">By ${question.creator_name} • ${formatDate(question.created_at)}</div>
-          </div>
-          ${question.description ? `<div class="question-description">${question.description}</div>` : ''}
-          <div class="options-grid">
-            ${question.options.map(option => {
-              const probability = option.probability || 0;
-              return `
-                <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
-                  <div class="option-info">
-                    <div class="option-text">${option.text}</div>
-                    <div class="option-stats">${option.bet_count} bets • ${option.total_shares.toFixed(2)} shares outstanding</div>
-                  </div>
-                  <div class="option-price">${formatProbability(probability)}</div>
-                  ${question.status === 'open' ? `
-                    <button class="btn-bet" onclick="openBetModal(${question.id}, ${option.id}, '${option.text}', '${question.title}')">
-                      Bet
-                    </button>
-                  ` : ''}
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      `).join('');
+    container.innerHTML = openQuestions
+      .map(question => renderQuestionCard(question, { allowBetting: true }))
+      .join('');
 
     // Refresh the profile to keep points in sync
     await refreshProfile();
   } catch (error) {
     console.error('Error loading questions:', error);
+  }
+}
+
+async function loadResolvedQuestions() {
+  try {
+    const response = await fetch(`${API_URL}/questions`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+
+    const questions = await response.json();
+    const resolvedQuestions = questions.filter(question => question.status === 'resolved');
+    const container = document.getElementById('resolved-questions-list');
+
+    if (resolvedQuestions.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">✅</div>
+          <div class="empty-state-text">No resolved questions yet</div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = resolvedQuestions
+      .map(question => renderQuestionCard(question, {
+        allowBetting: false,
+        showDeleteButton: Boolean(currentUser?.is_admin),
+        deleteScope: 'resolved'
+      }))
+      .join('');
+  } catch (error) {
+    console.error('Error loading resolved questions:', error);
   }
 }
 
@@ -724,8 +772,14 @@ async function loadAdminData() {
 
     container.innerHTML = questions.map(question => `
       <div class="question-card">
-        <div class="question-title">${question.title}</div>
-        <div class="question-meta">Status: ${question.status === 'open' ? 'Open' : 'Resolved'} • ${question.options.length} options</div>
+        <div class="question-header">
+          <div class="question-title">
+            ${question.title}
+            <span class="status-badge status-${question.status}">${question.status === 'open' ? 'Open' : 'Resolved'}</span>
+          </div>
+          <div class="question-meta">By ${question.creator_name} • ${formatDate(question.created_at)}</div>
+        </div>
+        ${question.description ? `<div class="question-description">${question.description}</div>` : ''}
         <div class="options-grid">
           ${question.options.map(option => `
             <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
@@ -733,6 +787,7 @@ async function loadAdminData() {
                 <div class="option-text">${option.text}</div>
                 <div class="option-stats">${option.bet_count} bets • ${option.total_shares.toFixed(2)} shares outstanding</div>
               </div>
+              <div class="option-price">${formatProbability(option.probability || 0)}</div>
               ${question.status === 'open' ? `
                 <button class="btn-resolve" onclick="resolveQuestion(${question.id}, ${option.id})">
                   Mark as correct
@@ -802,7 +857,8 @@ async function resetAllUsersPoints() {
 }
 
 async function deleteQuestion(questionId, status) {
-  const confirmationMessage = status === 'open'
+  const normalizedStatus = status === 'open' ? 'open' : 'resolved';
+  const confirmationMessage = normalizedStatus === 'open'
     ? 'Delete this open question? Current stakes will be refunded.'
     : 'Delete this resolved question? This will not change points that were already distributed.';
 
@@ -823,6 +879,7 @@ async function deleteQuestion(questionId, status) {
         refreshProfile(),
         loadAdminData(),
         loadQuestions(),
+        loadResolvedQuestions(),
         loadMyBets(),
         loadLeaderboard()
       ]);
@@ -859,6 +916,7 @@ async function resolveQuestion(questionId, optionId) {
         refreshProfile(),
         loadAdminData(),
         loadQuestions(),
+        loadResolvedQuestions(),
         loadMyBets(),
         loadLeaderboard()
       ]);

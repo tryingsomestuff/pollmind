@@ -59,6 +59,7 @@
         </div>
         <nav>
           <button onclick="showTab('questions')" class="nav-btn active" id="nav-questions">Questions</button>
+          <button onclick="showTab('resolved-questions')" class="nav-btn" id="nav-resolved-questions">Resolved Questions</button>
           <button onclick="showTab('my-bets')" class="nav-btn" id="nav-my-bets">My Bets</button>
           <button onclick="showTab('leaderboard')" class="nav-btn" id="nav-leaderboard">Leaderboard</button>
           <button onclick="showTab('admin')" class="nav-btn" id="nav-admin" style="display: none;">Admin</button>
@@ -71,6 +72,11 @@
       <div id="tab-questions" class="tab-content active">
         <h2>Open Questions</h2>
         <div id="questions-list"></div>
+      </div>
+
+      <div id="tab-resolved-questions" class="tab-content">
+        <h2>Resolved Questions</h2>
+        <div id="resolved-questions-list"></div>
       </div>
 
       <!-- Onglet Mes Paris -->
