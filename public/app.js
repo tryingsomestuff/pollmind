@@ -181,7 +181,7 @@ async function loadQuestions() {
                 <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
                   <div class="option-info">
                     <div class="option-text">${option.text}</div>
-                    <div class="option-stats">${option.bet_count} paris • ${option.total_shares.toFixed(2)} shares</div>
+                    <div class="option-stats">${option.bet_count} paris • ${option.total_shares.toFixed(2)} shares en circulation</div>
                   </div>
                   <div class="option-price">${(price * 100).toFixed(0)}%</div>
                   ${question.status === 'open' ? `
@@ -224,7 +224,7 @@ function openBetModal(questionId, optionId, optionText, questionTitle) {
     <p><strong>Votre choix:</strong> ${optionText}</p>
     <p><strong>Points disponibles:</strong> ${currentUser.points.toFixed(2)}</p>
     
-    <input type="number" id="bet-amount" class="bet-amount-input" placeholder="Montant à parier" min="0.1" step="0.1" />
+    <input type="number" id="bet-amount" class="bet-amount-input" placeholder="Points a miser" min="0.1" step="0.1" />
     
     <div class="bet-info" id="bet-calculation"></div>
     
@@ -276,10 +276,11 @@ async function calculateBetPreview() {
     const shares = amount / price;
     
     calcDiv.innerHTML = `
-      <p><strong>Prix actuel:</strong> ${(price * 100).toFixed(2)}%</p>
+      <p><strong>Mise:</strong> ${amount.toFixed(2)} points</p>
+      <p><strong>Prix actuel d'une share:</strong> ${price.toFixed(2)} point</p>
       <p><strong>Shares reçues:</strong> ${shares.toFixed(4)}</p>
       <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 10px;">
-        Si cette option gagne, vos gains dépendront du pool total et de votre part de shares.
+        Les points que vous depensez maintenant sont convertis en shares. Si cette option gagne, vous recuperez une part du pool total proportionnelle a vos shares.
       </p>
     `;
   } catch (error) {
@@ -317,7 +318,7 @@ async function placeBet() {
     const data = await response.json();
     
     if (response.ok) {
-      alert(`Pari enregistré ! Vous avez reçu ${data.shares.toFixed(4)} shares au prix de ${(data.price * 100).toFixed(2)}%`);
+      alert(`Pari enregistre ! Vous avez mise ${amount.toFixed(2)} points et recu ${data.shares.toFixed(4)} shares au prix de ${data.price.toFixed(2)} point par share.`);
       closeBetModal();
       await refreshProfile();
       loadQuestions();
@@ -355,13 +356,13 @@ async function loadMyBets() {
     container.innerHTML = bets.map(bet => {
       let statusClass = 'bet-status-pending';
       let statusText = 'En cours';
-      let amountLabel = `-${bet.amount.toFixed(2)} pts`;
+      let amountLabel = `-${bet.amount.toFixed(2)} pts mises`;
       
       if (bet.question_status === 'resolved') {
         if (bet.is_winner) {
           statusClass = 'bet-status-won';
           statusText = 'Gagne';
-          amountLabel = `+${bet.payout.toFixed(2)} pts`;
+          amountLabel = `+${bet.payout.toFixed(2)} pts recuperes`;
         } else {
           statusClass = 'bet-status-lost';
           statusText = 'Perdu';
@@ -376,8 +377,9 @@ async function loadMyBets() {
           </div>
           <div class="bet-details">
             <p><strong>Votre pari:</strong> ${bet.option_text}</p>
-            <p><strong>Prix:</strong> ${(bet.price * 100).toFixed(2)}% • <strong>Shares:</strong> ${bet.shares.toFixed(4)}</p>
-            ${bet.is_winner ? `<p><strong>Gain distribue:</strong> ${bet.payout.toFixed(2)} points</p>` : ''}
+            <p><strong>Mise initiale:</strong> ${bet.amount.toFixed(2)} points</p>
+            <p><strong>Prix d'achat:</strong> ${bet.price.toFixed(2)} point par share • <strong>Shares achetees:</strong> ${bet.shares.toFixed(4)}</p>
+            ${bet.is_winner ? `<p><strong>Paiement recu a la resolution:</strong> ${bet.payout.toFixed(2)} points</p>` : ''}
             <p><strong>Date:</strong> ${formatDate(bet.created_at)}</p>
             <span class="bet-status ${statusClass}">${statusText}</span>
           </div>
@@ -532,7 +534,7 @@ async function loadAdminData() {
             <div class="option-item">
               <div class="option-info">
                 <div class="option-text">${option.text}</div>
-                <div class="option-stats">${option.bet_count} paris • ${option.total_shares.toFixed(2)} shares</div>
+                <div class="option-stats">${option.bet_count} paris • ${option.total_shares.toFixed(2)} shares en circulation</div>
               </div>
               <button class="btn-resolve" onclick="resolveQuestion(${question.id}, ${option.id})">
                 Marquer comme correct
