@@ -1,107 +1,190 @@
-# 🔍 Clarification sur le Pricing Dynamique
+# 🔍 Mecanisme de cotation LMSR de PollMind
 
-## ⚠️ Point important : Somme des probabilités
+PollMind utilise maintenant un market maker **LMSR** (Logarithmic Market Scoring Rule) multi-options. Les pourcentages affiches dans l'interface sont donc de vraies probabilites normalisees au sens du modele : elles somment toujours a `100 %` pour une question donnee.
 
-Vous avez raison de remarquer que dans l'exemple donné, les "prix" ne somment pas à 100% :
-- Option A : 70%
-- Option B : 55%
-- **Total : 125% ≠ 100%**
+## 1. Etat du marche
 
-## 📊 Deux approches de marché de prédiction
+Pour une question avec `n` options, on note :
 
-### 1. **Marché avec probabilités normalisées** (Polymarket, Augur)
-✅ Les vrais marchés de prédiction utilisent cette méthode
+- `q_i` : le nombre total de shares outstanding sur l'option `i`
+- `q = (q_1, ..., q_n)` : l'etat courant du marche
+- `b` : le parametre de liquidite (`questions.liquidity_param`, valeur par defaut `50`)
 
-Dans ce système :
-- Les prix des options **somment toujours à 100%**
-- Si une option monte, l'autre descend automatiquement
-- Utilise des algorithmes complexes comme :
-  - **LMSR** (Logarithmic Market Scoring Rule)
-  - **Constant Product Market Maker** (type Uniswap)
+Le systeme n'affiche pas un prix arbitraire par option. Il derive les probabilites a partir de l'etat global `q`.
 
-**Exemple :**
-- Si A passe de 50% à 70% → B passe automatiquement de 50% à 30%
-- Somme : 70% + 30% = **100%** ✅
+## 2. Fonction de cout LMSR
 
-**Formule LMSR simplifiée :**
-```
-Prix(A) = e^(shares_A/b) / (e^(shares_A/b) + e^(shares_B/b))
-```
-Où `b` est un paramètre de liquidité.
+La fonction de cout du marche est :
 
-### 2. **Pricing indépendant simplifié** (implémentation actuelle PollMind)
-⚠️ C'est ce qui est actuellement implémenté (version simplifiée)
+$$
+C(q) = b \ln\left(\sum_{i=1}^{n} e^{q_i / b}\right)
+$$
 
-Dans notre système actuel :
-- Chaque option a un prix qui évolue **indépendamment**
-- Formule : `Prix = 0.50 + (shares × 0.01)`
-- Plus simple à implémenter et à comprendre
-- Mais les prix ne somment pas forcément à 100%
+Cette fonction a plusieurs proprietes utiles :
 
-**Pourquoi cette approche simplifiée ?**
-- ✅ Facile à comprendre pour les utilisateurs
-- ✅ Simple à implémenter
-- ✅ Transparent dans le calcul
-- ✅ Fonctionne pour un usage interne/pédagogique
-- ❌ Moins rigoureux mathématiquement
-- ❌ Ne représente pas de "vraies" probabilités
+- elle est convexe ;
+- elle fournit un cout marginal croissant quand une option devient dominante ;
+- elle borne la perte maximale theorique du market maker.
 
-## 🎯 Comment interpréter les "prix" actuels
+La borne de perte maximale vaut :
 
-Dans la version actuelle de PollMind, les pourcentages représentent :
-- **Le coût relatif** de parier sur cette option
-- **Pas une probabilité pure** au sens mathématique
+$$
+	ext{loss}_{max} = b \ln(n)
+$$
 
-**Interprétation correcte :**
-- Prix à 70% → "Cette option coûte 70% par share"
-- Prix à 55% → "Cette option coûte 55% par share"
-- Une option chère = beaucoup de gens ont parié dessus
-- Une option bon marché = peu de gens ont parié dessus
+Exemples avec `b = 50` :
 
-## 💡 Amélioration possible : Implémentation LMSR
+- 2 options : `50 ln(2) ≈ 34.66`
+- 3 options : `50 ln(3) ≈ 54.93`
+- 4 options : `50 ln(4) ≈ 69.31`
 
-Pour avoir un vrai marché avec probabilités sommant à 100%, on pourrait implémenter LMSR :
+## 3. Probabilites affichees
 
-```javascript
-function calculateLMSRPrice(sharesA, sharesB, liquidityParam = 100) {
-  const expA = Math.exp(sharesA / liquidityParam);
-  const expB = Math.exp(sharesB / liquidityParam);
-  const totalExp = expA + expB;
-  
-  return {
-    priceA: expA / totalExp,  // Toujours entre 0 et 1
-    priceB: expB / totalExp   // priceA + priceB = 1.0 (100%)
-  };
-}
-```
+La probabilite de l'option `i` est le gradient de la fonction de cout :
 
-## 🔄 Quelle version utiliser ?
+$$
+p_i(q) = \frac{e^{q_i / b}}{\sum_{j=1}^{n} e^{q_j / b}}
+$$
 
-**Pour un usage interne / pédagogique :**
-→ Version actuelle (pricing indépendant) suffit
-- Simple à expliquer
-- Encourage les paris sur options impopulaires
-- Fonctionne bien pour l'agrégation d'opinion
+On a automatiquement :
 
-**Pour un vrai marché de prédiction public :**
-→ Implémenter LMSR ou CPMM
-- Probabilités normalisées
-- Plus rigoureux
-- Standard de l'industrie
+$$
+\sum_{i=1}^{n} p_i(q) = 1
+$$
 
-## 📝 Conclusion
+Donc, dans PollMind :
 
-La version actuelle de PollMind utilise un **système simplifié** où les prix évoluent indépendamment. C'est parfait pour :
-- Comprendre les mécanismes de base
-- Usage interne en entreprise
-- Encourager la participation
+- si une option monte, au moins une autre baisse ;
+- les pourcentages restent coherents meme avec 3, 4 ou 5 reponses ;
+- les probabilites ne peuvent jamais depasser `100 %` au total.
 
-Pour une plateforme professionnelle de prédiction, une implémentation LMSR serait préférable pour garantir que les prix représentent de vraies probabilités qui somment à 100%.
+## 4. Comment une mise est transformee en shares
 
-**En pratique :** Le système actuel fonctionne bien car :
-1. Il encourage les paris sur options impopulaires (prix bas)
-2. Il pénalise les paris "moutonnier" (prix élevé)
-3. Il redistribue équitablement les gains aux gagnants
-4. C'est transparent et facile à comprendre
+Quand un utilisateur depense un montant `x` sur l'option `k`, le serveur ne fait pas `shares = x / prix_courant` comme dans l'ancien modele. Il cherche une quantite `\Delta q` telle que :
 
-C'est un bon compromis entre simplicité et fonctionnalité ! 🎯
+$$
+C(q + \Delta q \cdot e_k) - C(q) = x
+$$
+
+ou `e_k` est le vecteur unitaire de l'option `k`.
+
+En pratique, PollMind resout cette equation par recherche binaire :
+
+1. calcul du cout courant `C(q)` ;
+2. simulation d'un ajout de shares sur l'option cible ;
+3. ajustement iteratif de `\Delta q` jusqu'a ce que l'ecart de cout soit egal au montant depense.
+
+Consequence :
+
+- plus une option est deja achetee, moins un meme montant achete de shares supplementaires ;
+- le prix moyen paye sur une transaction est superieur ou egal au cout marginal initial ;
+- la courbe de prix est lisse et sans seuil artificiel.
+
+## 5. Exemple chiffre a 3 options
+
+Prenons une question a 3 options avec `b = 50` et un marche initial :
+
+$$
+q = (0, 0, 0)
+$$
+
+Alors :
+
+$$
+p_1 = p_2 = p_3 = \frac{1}{3}
+$$
+
+Supposons qu'un utilisateur depense `10` points sur l'option 1.
+
+Le systeme cherche `\Delta q` tel que :
+
+$$
+50 \ln\left(e^{\Delta q/50} + 1 + 1\right) - 50 \ln(3) = 10
+$$
+
+En resolvant :
+
+$$
+e^{\Delta q/50} = 3e^{0.2} - 2 \approx 1.6642
+$$
+
+Donc :
+
+$$
+\Delta q \approx 50 \ln(1.6642) \approx 25.46
+$$
+
+Le parieur recoit donc environ `25.46` shares.
+
+Les nouvelles probabilites deviennent :
+
+$$
+p_1 = \frac{1.6642}{1.6642 + 1 + 1} \approx 45.40\%
+$$
+
+$$
+p_2 = p_3 = \frac{1}{3.6642} \approx 27.30\%
+$$
+
+La somme vaut bien `100 %`.
+
+## 6. Effet du parametre de liquidite `b`
+
+Le parametre `b` controle la sensibilite du marche :
+
+- **petit `b`** : le marche bouge vite, les probabilites changent fortement pour des mises modestes ;
+- **grand `b`** : le marche est plus profond, il faut des mises plus importantes pour le deplacer.
+
+Intuition utile :
+
+- `b` faible = plus reactif, plus volatil ;
+- `b` eleve = plus stable, plus conservateur.
+
+Avec la valeur actuelle `b = 50`, PollMind reste assez reactif tout en evitant les sauts trop brutaux sur les petites questions internes.
+
+## 7. Regle de payout a la resolution
+
+La resolution est maintenant simple :
+
+- si votre option gagne, chaque share vaut `1` point ;
+- si vous detenez `s` shares gagnantes, votre payout vaut `s` ;
+- si votre option perd, votre payout vaut `0`.
+
+Autrement dit :
+
+$$
+	ext{payout} =
+\begin{cases}
+s & \text{si l'option est correcte} \\
+0 & \text{sinon}
+\end{cases}
+$$
+
+Le profit net d'une mise de montant `x` qui a achete `s` shares est donc :
+
+$$
+	ext{profit} = s - x
+$$
+
+Ce modele est different de l'ancien systeme de redistribution proportionnelle d'un pool. Le payout depend maintenant uniquement du nombre de shares detenues sur la bonne reponse.
+
+## 8. Pourquoi ce modele est meilleur que l'ancien
+
+L'ancien modele utilisait des prix independants par option. Il etait simple, mais mathematiquement incoherent pour une question multi-reponses.
+
+Le LMSR corrige cela :
+
+- les probabilites sont normalisees ;
+- le marche fonctionne de la meme maniere avec 2 ou 6 options ;
+- le cout d'une transaction depend du deplacement reel du marche ;
+- le risque theorique du market maker est borne.
+
+## 9. Lecture correcte des pourcentages dans PollMind
+
+Les pourcentages affiches dans l'application doivent etre lus comme :
+
+- l'etat instantane du consensus du marche ;
+- pas une verite objective ;
+- une probabilite implicite issue des positions deja achetees.
+
+En pratique, cela signifie qu'une option a `62 %` est simplement celle que le marche considere actuellement comme la plus probable, compte tenu des mises deja engagees.

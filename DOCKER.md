@@ -17,7 +17,7 @@ docker compose down
 
 L'application sera accessible sur : **http://localhost:81**
 
-Il n'est pas necessaire d'executer `npm install` sur la machine hote pour utiliser Docker. Le build de l'image lance `npm ci` a partir de `package.json` et `package-lock.json`.
+Il n'est pas necessaire d'executer `npm install` sur la machine hote pour utiliser Docker. Le build de l'image lance `npm ci --omit=dev` a partir de `package.json` et `package-lock.json`.
 
 En revanche, si vous modifiez les dependances ou le registry npm, il faut d'abord regenerer `package-lock.json` avec npm sur l'hote, puis rebuilder l'image.
 
@@ -33,7 +33,7 @@ docker volume create pollmind-data
 # Lancer le container
 docker run -d \
   --name pollmind \
-  -p 3000:3000 \
+  -p 81:3000 \
   -v pollmind-data:/app/data \
   -e SECRET_KEY=votre-secret-key-securisee \
   pollmind:latest
@@ -61,7 +61,7 @@ docker volume rm pollmind-data
 ### Variables d'environnement
 
 ```bash
-# docker compose.yml
+# docker-compose.yml
 environment:
   - NODE_ENV=production
   - PORT=3000
@@ -71,7 +71,7 @@ environment:
 ### Personnaliser le port
 
 ```bash
-# Dans docker compose.yml
+# Dans docker-compose.yml
 ports:
   - "8080:3000"  # Exposer sur le port 8080 au lieu de 3000
 ```
@@ -105,13 +105,13 @@ services:
 docker build -t pollmind:1.0.0 .
 ```
 
-### Optimisations incluses
+### Caracteristiques du build actuel
 
-- ✅ Image multi-stage (Alpine Linux)
-- ✅ Dépendances production uniquement (`npm ci --only=production`)
+- ✅ Image Node 20 Alpine
+- ✅ Dependances production uniquement (`npm ci --omit=dev`)
 - ✅ Utilisateur non-root (sécurité)
 - ✅ Healthcheck automatique
-- ✅ `.dockerignore` pour exclure fichiers inutiles
+- ✅ Volume Docker pour persister `./data/pollmind.db`
 
 ## 🔍 Commandes utiles
 
@@ -125,8 +125,8 @@ docker compose logs -f pollmind
 # Entrer dans le container
 docker compose exec pollmind sh
 
-# Vérifier l'état de santé
-docker inspect pollmind | grep Health -A 10
+# Vérifier l'etat de sante
+docker inspect pollmind-app | grep Health -A 10
 
 # Nettoyer les ressources Docker
 docker compose down -v  # Attention : supprime aussi les volumes !
@@ -145,15 +145,13 @@ sh get-docker.sh
 git clone <votre-repo> pollmind
 cd pollmind
 
-# 3. Configurer les variables d'environnement
-cp .env.example .env
-nano .env  # Modifier SECRET_KEY
+# 3. Modifier la variable SECRET_KEY dans docker-compose.yml
 
 # 4. Lancer
 docker compose up -d
 
-# 5. Vérifier
-curl http://localhost:3000
+# 5. Verifier
+curl http://localhost:81
 ```
 
 ### Avec reverse proxy (Nginx)
@@ -165,7 +163,7 @@ server {
     server_name pollmind.votredomaine.com;
 
     location / {
-        proxy_pass http://localhost:3000\;
+        proxy_pass http://localhost:81;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -196,8 +194,8 @@ docker push votre-registry/pollmind:latest
    ```
 
 2. **Variables d'environnement** :
-   - Ne pas mettre de secrets dans `docker compose.yml`
-   - Utiliser un fichier `.env` (non versionné)
+- Ne pas laisser la valeur par defaut dans `docker-compose.yml`
+- Injecter le secret depuis votre orchestrateur ou un fichier `.env` non versionne si vous industrialisez le deploiement
 
 3. **HTTPS** :
    - Utiliser un reverse proxy (Nginx, Caddy, Traefik)
@@ -290,7 +288,7 @@ chmod 755 data
 ### Le port 3000 est déjà utilisé
 
 ```bash
-# Changer le port dans docker compose.yml
+# Changer le port dans docker-compose.yml
 ports:
   - "8080:3000"
 ```

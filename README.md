@@ -1,6 +1,6 @@
 # PollMind
 
-Système de marché de prédiction interne pour questions scientifiques et techniques.
+Systeme interne de marche de prediction pour questions scientifiques et techniques.
 
 ## 🚀 Démarrage rapide
 
@@ -13,11 +13,11 @@ docker compose up -d --build
 # L'application sera accessible sur http://localhost:81
 ```
 
-Pour Docker, il n'est pas nécessaire d'executer `npm install` sur la machine hote avant le build. L'image copie `package.json` et `package-lock.json`, puis installe les dependances avec `npm ci` dans le conteneur.
+Pour Docker, il n'est pas necessaire d'executer `npm install` sur la machine hote avant le build. L'image copie `package.json` et `package-lock.json`, puis installe les dependances avec `npm ci --omit=dev` dans le conteneur.
 
 Le prerequis cote depot est simplement d'avoir un `package-lock.json` present et a jour.
 
-**Voir [DOCKER.md](DOCKER.md) pour la documentation complète Docker**
+Voir [DOCKER.md](DOCKER.md) pour la documentation complete Docker.
 
 ### Option 2 : Installation locale (Node.js)
 
@@ -29,16 +29,16 @@ npm install
 npm start
 ```
 
-Pour le développement avec auto-reload:
+Pour le developpement avec auto-reload :
 ```bash
 npm run dev
 ```
 
 ## ⚙️ Configuration NPM Registry
 
-Selon votre environnement, vous devez configurer le registry npm approprié :
+Selon votre environnement, vous devez configurer le registry npm approprie :
 
-### En dehors du réseau Michelin (usage public)
+### En dehors du reseau Michelin (usage public)
 
 ```bash
 # Supprimer toute configuration précédente
@@ -54,7 +54,7 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-### Sur le réseau Michelin (réseau interne)
+### Sur le reseau Michelin (reseau interne)
 
 ```bash
 # Supprimer toute configuration précédente
@@ -70,7 +70,7 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-### Rebuild Docker après changement de registry
+### Rebuild Docker apres changement de registry
 
 Si vous changez de registry npm, il faut regenerer le `package-lock.json` avec npm sur la machine hote, puis rebuilder l'image Docker :
 
@@ -82,10 +82,10 @@ docker compose build --no-cache
 docker compose up -d
 ```
 
-**⚠️ Note importante** : Le `package-lock.json` contient les URLs exactes des packages. Il doit etre regenere a chaque changement de registry, ainsi que le dossier `node_modules`.
+Note importante : le `package-lock.json` contient les URL exactes des packages. Il doit etre regenere a chaque changement de registry, ainsi que le dossier `node_modules`.
 
 
-## 🌐 Configuration Apache Reverse Proxy
+## Configuration Apache Reverse Proxy
 
 Pour exposer l'application via Apache sur un sous-chemin (ex: `https://votre-domaine.com/pollmind/`), suivez ces étapes :
 
@@ -115,10 +115,10 @@ Ajoutez ces lignes dans votre fichier VirtualHost SSL (généralement `/etc/apac
 </VirtualHost>
 ```
 
-**⚠️ Important :** 
-- Les **slashes finaux** (`/`) sont obligatoires dans les URLs ProxyPass
-- Sans eux, Apache ne retire pas le préfixe `/pollmind` de l'URL avant de la transmettre au backend
-- Le numéro de port (81 dans cet exemple) doit correspondre au port exposé dans `docker-compose.yml`
+Important :
+- Les slashes finaux (`/`) sont obligatoires dans les URLs `ProxyPass`
+- Sans eux, Apache ne retire pas le prefixe `/pollmind` de l'URL avant de la transmettre au backend
+- Le numero de port (81 dans cet exemple) doit correspondre au port expose dans `docker-compose.yml`
 
 ### 3. Redémarrer Apache
 
@@ -176,10 +176,29 @@ L'application Node.js écoute toujours sur le port 3000 **à l'intérieur** du c
 3. Les admins peuvent créer des questions
 4. Les participants peuvent parier avec leurs points (100 au départ)
 
-## Fonctionnalités
+## Fonctionnalites
 
 - Authentification utilisateurs (admin/participant)
 - Création de questions par les admins
-- Système de paris avec pricing dynamique
-- Les réponses deviennent plus chères quand elles ont plus de votes
+- Marche de prediction multi-options avec LMSR
+- Probabilites normalisees qui somment a 100 % par question
+- Prix de transaction calcule a partir du cout marginal du marche
 - Gestion automatique des points
+
+## Systeme de cotation
+
+PollMind utilise un market maker LMSR multi-options.
+
+- Chaque question possede un parametre de liquidite `b` stocke dans `questions.liquidity_param`.
+- La fonction de cout est : `C(q) = b * ln(sum_i exp(q_i / b))`.
+- La probabilite affichee pour l'option `i` est : `p_i = exp(q_i / b) / sum_j exp(q_j / b)`.
+- Lorsqu'un utilisateur depense un montant `x` sur une option, le serveur cherche la quantite de shares `Delta q` telle que `C(q + Delta q * e_i) - C(q) = x`.
+- A la resolution, chaque winning share paie `1` point. Une mise gagnante rembourse donc `shares`, pas une fraction d'un pool.
+
+Consequence directe :
+
+- les probabilites affichees restent coherentes, meme avec plus de deux reponses ;
+- un marche plus liquide bouge moins vite ;
+- la perte theorique maximale du market maker est bornee par `b * ln(n)`, ou `n` est le nombre d'options.
+
+Voir [PRICING_EXPLANATION.md](PRICING_EXPLANATION.md) pour les details mathematiques et des exemples de calcul.
