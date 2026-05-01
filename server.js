@@ -125,6 +125,41 @@ app.get('/api/profile', authenticateToken, (req, res) => {
   }
 });
 
+// Changement de mot de passe
+app.post('/api/change-password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Ancien et nouveau mot de passe requis' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'Le nouveau mot de passe doit contenir au moins 6 caracteres' });
+  }
+
+  try {
+    const user = queryOne('SELECT id, password FROM users WHERE id = ?', [req.user.id]);
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur non trouve' });
+    }
+
+    const validPassword = await bcrypt.compare(currentPassword, user.password);
+
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Mot de passe actuel incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    run('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, req.user.id]);
+
+    res.json({ message: 'Mot de passe mis a jour' });
+  } catch (error) {
+    console.error('Erreur changement mot de passe:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 // Bonus journalier
 app.post('/api/daily-bonus', authenticateToken, (req, res) => {
   try {

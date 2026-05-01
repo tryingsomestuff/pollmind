@@ -419,6 +419,10 @@ main h2 {
   color: white;
 }
 
+.btn-password {
+  margin-right: 0;
+}
+
 .btn-bet {
   background: var(--success-color);
   color: white;
@@ -502,6 +506,16 @@ main h2 {
   padding: 15px;
   border-radius: 6px;
   margin: 15px 0;
+}
+
+.password-form .btn-primary {
+  width: 100%;
+}
+
+.form-hint {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: -4px 0 16px;
 }
 
 /* ========== ADMIN ========== */
@@ -700,6 +714,11 @@ textarea.full-width {
   .header-content {
     flex-direction: column;
     gap: 15px;
+  }
+
+  .user-info {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   nav {

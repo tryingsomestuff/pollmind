@@ -266,6 +266,61 @@ function closeBetModal() {
   currentBet = null;
 }
 
+function openPasswordModal() {
+  document.getElementById('password-modal').style.display = 'block';
+  document.getElementById('current-password').value = '';
+  document.getElementById('new-password').value = '';
+  document.getElementById('confirm-new-password').value = '';
+}
+
+function closePasswordModal() {
+  document.getElementById('password-modal').style.display = 'none';
+}
+
+async function changePassword() {
+  const currentPassword = document.getElementById('current-password').value;
+  const newPassword = document.getElementById('new-password').value;
+  const confirmNewPassword = document.getElementById('confirm-new-password').value;
+
+  if (!currentPassword || !newPassword || !confirmNewPassword) {
+    alert('Veuillez remplir tous les champs');
+    return;
+  }
+
+  if (newPassword.length < 6) {
+    alert('Le nouveau mot de passe doit contenir au moins 6 caracteres');
+    return;
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    alert('La confirmation du nouveau mot de passe ne correspond pas');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      closePasswordModal();
+      alert('Mot de passe mis a jour avec succes');
+    } else {
+      alert(data.error || 'Erreur lors du changement de mot de passe');
+    }
+  } catch (error) {
+    console.error('Erreur changement mot de passe:', error);
+    alert('Erreur de connexion au serveur');
+  }
+}
+
 async function calculateBetPreview() {
   const amount = parseFloat(document.getElementById('bet-amount').value);
   const calcDiv = document.getElementById('bet-calculation');
@@ -676,9 +731,15 @@ function formatDate(dateString) {
 // ========== INITIALISATION ==========
 
 window.onclick = function(event) {
-  const modal = document.getElementById('bet-modal');
-  if (event.target === modal) {
+  const betModal = document.getElementById('bet-modal');
+  const passwordModal = document.getElementById('password-modal');
+
+  if (event.target === betModal) {
     closeBetModal();
+  }
+
+  if (event.target === passwordModal) {
+    closePasswordModal();
   }
 };
 

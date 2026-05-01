@@ -53,6 +53,7 @@
             <span id="user-name"></span>
             <span class="points" id="user-points"></span>
             <button onclick="claimDailyBonus()" class="btn-bonus" title="Réclamer votre bonus journalier de 10 points">🎁 Bonus</button>
+            <button onclick="openPasswordModal()" class="btn-secondary btn-password" title="Changer mon mot de passe">🔐 Mot de passe</button>
             <button onclick="logout()" class="btn-secondary">Déconnexion</button>
           </div>
         </div>
@@ -117,6 +118,20 @@
       <span class="close" onclick="closeBetModal()">&times;</span>
       <h2>Placer un pari</h2>
       <div id="bet-modal-content"></div>
+    </div>
+  </div>
+
+  <div id="password-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closePasswordModal()">&times;</span>
+      <h2>Changer mon mot de passe</h2>
+      <div class="password-form">
+        <input type="password" id="current-password" class="full-width" placeholder="Mot de passe actuel" />
+        <input type="password" id="new-password" class="full-width" placeholder="Nouveau mot de passe" />
+        <input type="password" id="confirm-new-password" class="full-width" placeholder="Confirmer le nouveau mot de passe" />
+        <p class="form-hint">Minimum 6 caracteres.</p>
+        <button onclick="changePassword()" class="btn-primary">Mettre a jour le mot de passe</button>
+      </div>
     </div>
   </div>
 
