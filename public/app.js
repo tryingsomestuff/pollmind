@@ -6,6 +6,30 @@ const API_URL = `${BASE_PATH}/api`;
 let currentUser = null;
 let authToken = null;
 
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+
+  const themeToggle = document.getElementById('theme-toggle');
+  if (themeToggle) {
+    const isDark = theme === 'dark';
+    themeToggle.textContent = isDark ? '☀️' : '🌙';
+    themeToggle.setAttribute('aria-label', isDark ? 'Passer au theme clair' : 'Passer au theme sombre');
+    themeToggle.setAttribute('title', isDark ? 'Passer au theme clair' : 'Passer au theme sombre');
+  }
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('pollmind-theme', nextTheme);
+  applyTheme(nextTheme);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const theme = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(theme);
+});
+
 // ========== AUTHENTIFICATION ==========
 
 function showLogin() {
