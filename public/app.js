@@ -355,23 +355,29 @@ async function loadMyBets() {
     container.innerHTML = bets.map(bet => {
       let statusClass = 'bet-status-pending';
       let statusText = 'En cours';
+      let amountLabel = `-${bet.amount.toFixed(2)} pts`;
       
       if (bet.question_status === 'resolved') {
-        // Vérifier si l'option pariée était la bonne
-        // Cette information devrait être enrichie côté serveur
-        statusClass = 'bet-status-lost';
-        statusText = 'Perdu';
+        if (bet.is_winner) {
+          statusClass = 'bet-status-won';
+          statusText = 'Gagne';
+          amountLabel = `+${bet.payout.toFixed(2)} pts`;
+        } else {
+          statusClass = 'bet-status-lost';
+          statusText = 'Perdu';
+        }
       }
       
       return `
         <div class="bet-item">
           <div class="bet-item-header">
             <div class="bet-question">${bet.question_title}</div>
-            <div class="bet-amount">-${bet.amount.toFixed(2)} pts</div>
+            <div class="bet-amount">${amountLabel}</div>
           </div>
           <div class="bet-details">
             <p><strong>Votre pari:</strong> ${bet.option_text}</p>
             <p><strong>Prix:</strong> ${(bet.price * 100).toFixed(2)}% • <strong>Shares:</strong> ${bet.shares.toFixed(4)}</p>
+            ${bet.is_winner ? `<p><strong>Gain distribue:</strong> ${bet.payout.toFixed(2)} points</p>` : ''}
             <p><strong>Date:</strong> ${formatDate(bet.created_at)}</p>
             <span class="bet-status ${statusClass}">${statusText}</span>
           </div>
@@ -560,8 +566,13 @@ async function resolveQuestion(questionId, optionId) {
     
     if (response.ok) {
       alert('Question résolue ! Les gains ont été distribués.');
-      loadAdminData();
-      loadQuestions();
+      await Promise.all([
+        refreshProfile(),
+        loadAdminData(),
+        loadQuestions(),
+        loadMyBets(),
+        loadLeaderboard()
+      ]);
     } else {
       alert(data.error || 'Erreur résolution question');
     }

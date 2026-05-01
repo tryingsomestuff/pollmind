@@ -233,13 +233,29 @@ app.post('/api/questions/:id/resolve', authenticateToken, requireAdmin, (req, re
   const questionId = req.params.id;
 
   try {
+    const question = queryOne('SELECT id, status FROM questions WHERE id = ?', [questionId]);
+
+    if (!question) {
+      return res.status(404).json({ error: 'Question non trouvée' });
+    }
+
+    if (question.status !== 'open') {
+      return res.status(400).json({ error: 'Cette question est deja resolue' });
+    }
+
+    const option = queryOne('SELECT id FROM options WHERE id = ? AND question_id = ?', [optionId, questionId]);
+
+    if (!option) {
+      return res.status(400).json({ error: 'Option invalide pour cette question' });
+    }
+
     run('UPDATE questions SET status = ?, resolution = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?', ['resolved', optionId, questionId]);
-    run('UPDATE options SET is_correct = 1 WHERE id = ?', [optionId]);
+    run('UPDATE options SET is_correct = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE question_id = ?', [optionId, questionId]);
 
     // Redistribuer les gains
-    distributeWinnings(questionId, optionId);
+    const payoutSummary = distributeWinnings(questionId, optionId);
 
-    res.json({ message: 'Question résolue' });
+    res.json({ message: 'Question résolue', payoutSummary });
   } catch (error) {
     res.status(500).json({ error: 'Erreur résolution question' });
   }
@@ -248,21 +264,30 @@ app.post('/api/questions/:id/resolve', authenticateToken, requireAdmin, (req, re
 // Fonction pour redistribuer les gains
 function distributeWinnings(questionId, correctOptionId) {
   try {
-    const winningBets = query('SELECT user_id, shares FROM bets WHERE question_id = ? AND option_id = ?', [questionId, correctOptionId]);
-
-    if (winningBets.length === 0) return;
+    const winningBets = query('SELECT id, user_id, shares FROM bets WHERE question_id = ? AND option_id = ?', [questionId, correctOptionId]);
 
     const poolData = queryOne('SELECT SUM(amount) as total_pool FROM bets WHERE question_id = ?', [questionId]);
-
     const totalPool = poolData?.total_pool || 0;
+
+    if (winningBets.length === 0) {
+      return { totalPool, totalWinningShares: 0, winnerCount: 0 };
+    }
+
     const totalWinningShares = winningBets.reduce((sum, bet) => sum + bet.shares, 0);
 
     winningBets.forEach(bet => {
       const winnings = (bet.shares / totalWinningShares) * totalPool;
       run('UPDATE users SET points = points + ? WHERE id = ?', [winnings, bet.user_id]);
     });
+
+    return {
+      totalPool,
+      totalWinningShares,
+      winnerCount: winningBets.length
+    };
   } catch (error) {
     console.error('Erreur distribution gains:', error);
+    throw error;
   }
 }
 
@@ -315,9 +340,54 @@ app.post('/api/bets', authenticateToken, (req, res) => {
 // Historique des paris
 app.get('/api/my-bets', authenticateToken, (req, res) => {
   try {
-    const bets = query('SELECT b.*, q.title as question_title, o.text as option_text, q.status as question_status FROM bets b JOIN questions q ON b.question_id = q.id JOIN options o ON b.option_id = o.id WHERE b.user_id = ? ORDER BY b.created_at DESC', [req.user.id]);
+    const bets = query(
+      'SELECT b.*, q.title as question_title, q.status as question_status, q.resolution as question_resolution, o.text as option_text FROM bets b JOIN questions q ON b.question_id = q.id JOIN options o ON b.option_id = o.id WHERE b.user_id = ? ORDER BY b.created_at DESC',
+      [req.user.id]
+    );
 
-    res.json(bets);
+    const resolvedQuestionIds = [...new Set(
+      bets
+        .filter(bet => bet.question_status === 'resolved')
+        .map(bet => bet.question_id)
+    )];
+
+    const resolutionStats = new Map();
+
+    resolvedQuestionIds.forEach(questionId => {
+      const poolData = queryOne('SELECT SUM(amount) as total_pool FROM bets WHERE question_id = ?', [questionId]);
+      const winningSharesData = queryOne(
+        'SELECT SUM(shares) as total_winning_shares FROM bets WHERE question_id = ? AND option_id = (SELECT resolution FROM questions WHERE id = ?)',
+        [questionId, questionId]
+      );
+
+      resolutionStats.set(questionId, {
+        totalPool: poolData?.total_pool || 0,
+        totalWinningShares: winningSharesData?.total_winning_shares || 0
+      });
+    });
+
+    const enrichedBets = bets.map(bet => {
+      const isResolved = bet.question_status === 'resolved';
+      const isWinningBet = isResolved && Number(bet.question_resolution) === Number(bet.option_id);
+      let payout = 0;
+
+      if (isWinningBet) {
+        const stats = resolutionStats.get(bet.question_id);
+
+        if (stats && stats.totalWinningShares > 0) {
+          payout = (bet.shares / stats.totalWinningShares) * stats.totalPool;
+        }
+      }
+
+      return {
+        ...bet,
+        is_resolved: isResolved,
+        is_winner: isWinningBet,
+        payout
+      };
+    });
+
+    res.json(enrichedBets);
   } catch (error) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
