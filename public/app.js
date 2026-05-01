@@ -436,6 +436,9 @@ async function loadMyBets() {
       let statusClass = 'bet-status-pending';
       let statusText = 'Open';
       let amountLabel = `-${bet.amount.toFixed(2)} pts staked`;
+      const isOwnBet = !bet.bettor_username || bet.bettor_username === currentUser.username;
+      const pickLabel = isOwnBet ? 'Your pick' : `${bet.bettor_username}'s pick`;
+      const stakeLabel = isOwnBet ? 'Original stake' : `${bet.bettor_username}'s stake`;
       
       if (bet.question_status === 'resolved') {
         if (bet.is_winner) {
@@ -455,8 +458,9 @@ async function loadMyBets() {
             <div class="bet-amount">${amountLabel}</div>
           </div>
           <div class="bet-details">
-            <p><strong>Your pick:</strong> ${bet.option_text}</p>
-            <p><strong>Original stake:</strong> ${bet.amount.toFixed(2)} points</p>
+            ${!isOwnBet ? `<p><strong>Bettor:</strong> ${bet.bettor_username}</p>` : ''}
+            <p><strong>${pickLabel}:</strong> ${bet.option_text}</p>
+            <p><strong>${stakeLabel}:</strong> ${bet.amount.toFixed(2)} points</p>
             <p><strong>Purchase price:</strong> ${bet.price.toFixed(2)} point per share • <strong>Shares bought:</strong> ${bet.shares.toFixed(4)}</p>
             ${bet.is_winner ? `<p><strong>Payout at resolution:</strong> ${bet.payout.toFixed(2)} points</p>` : ''}
             <p><strong>Date:</strong> ${formatDate(bet.created_at)}</p>

@@ -442,10 +442,16 @@ app.post('/api/bets', authenticateToken, (req, res) => {
 // Bet history
 app.get('/api/my-bets', authenticateToken, (req, res) => {
   try {
-    const bets = query(
-      'SELECT b.*, q.title as question_title, q.status as question_status, q.resolution as question_resolution, o.text as option_text FROM bets b JOIN questions q ON b.question_id = q.id JOIN options o ON b.option_id = o.id WHERE b.user_id = ? ORDER BY b.created_at DESC',
-      [req.user.id]
-    );
+    const canViewAllBets = Boolean(req.user.is_admin);
+    const bets = canViewAllBets
+      ? query(
+        'SELECT b.*, u.username as bettor_username, q.title as question_title, q.status as question_status, q.resolution as question_resolution, o.text as option_text FROM bets b JOIN users u ON b.user_id = u.id JOIN questions q ON b.question_id = q.id JOIN options o ON b.option_id = o.id ORDER BY b.created_at DESC',
+        []
+      )
+      : query(
+        'SELECT b.*, u.username as bettor_username, q.title as question_title, q.status as question_status, q.resolution as question_resolution, o.text as option_text FROM bets b JOIN users u ON b.user_id = u.id JOIN questions q ON b.question_id = q.id JOIN options o ON b.option_id = o.id WHERE b.user_id = ? ORDER BY b.created_at DESC',
+        [req.user.id]
+      );
 
     const resolvedQuestionIds = [...new Set(
       bets
@@ -485,7 +491,8 @@ app.get('/api/my-bets', authenticateToken, (req, res) => {
         ...bet,
         is_resolved: isResolved,
         is_winner: isWinningBet,
-        payout
+        payout,
+        can_view_all_bets: canViewAllBets
       };
     });
 
