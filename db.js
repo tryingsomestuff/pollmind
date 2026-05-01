@@ -4,6 +4,65 @@ const fs = require('fs');
 
 let db = null;
 const DB_FILE = './data/pollmind.db';
+const DEFAULT_LMSR_LIQUIDITY = 50;
+
+function mapExecResults(results) {
+  if (results.length === 0) return [];
+
+  const columns = results[0].columns;
+  const values = results[0].values;
+
+  return values.map(row => {
+    const entry = {};
+    columns.forEach((column, index) => {
+      entry[column] = row[index];
+    });
+    return entry;
+  });
+}
+
+function execQuery(sql, params = []) {
+  return mapExecResults(db.exec(sql, params));
+}
+
+function ensureColumn(tableName, columnName, definition) {
+  const existingColumns = execQuery(`PRAGMA table_info(${tableName})`);
+  const alreadyExists = existingColumns.some(column => column.name === columnName);
+
+  if (!alreadyExists) {
+    db.run(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
+function backfillResolvedBetPayouts() {
+  const resolvedQuestions = execQuery(
+    'SELECT id, resolution FROM questions WHERE status = ? AND resolution IS NOT NULL',
+    ['resolved']
+  );
+
+  resolvedQuestions.forEach(question => {
+    const bets = execQuery('SELECT id, option_id, amount, shares, payout FROM bets WHERE question_id = ?', [question.id]);
+    const hasMissingPayout = bets.some(bet => bet.payout === null || bet.payout === undefined);
+
+    if (!hasMissingPayout) {
+      return;
+    }
+
+    const totalPool = bets.reduce((sum, bet) => sum + (bet.amount || 0), 0);
+    const winningBets = bets.filter(bet => Number(bet.option_id) === Number(question.resolution));
+    const totalWinningShares = winningBets.reduce((sum, bet) => sum + (bet.shares || 0), 0);
+
+    bets.forEach(bet => {
+      let payout = 0;
+
+      if (Number(bet.option_id) === Number(question.resolution) && totalWinningShares > 0) {
+        payout = (bet.shares / totalWinningShares) * totalPool;
+      }
+
+      db.run('UPDATE bets SET payout = ? WHERE id = ?', [payout, bet.id]);
+    });
+  });
+}
 
 async function initDatabase() {
   const SQL = await initSqlJs();
@@ -65,6 +124,13 @@ async function initDatabase() {
     );
   `);
 
+  ensureColumn('questions', 'liquidity_param', `REAL DEFAULT ${DEFAULT_LMSR_LIQUIDITY}`);
+  ensureColumn('bets', 'payout', 'REAL');
+
+  db.run('UPDATE questions SET liquidity_param = ? WHERE liquidity_param IS NULL', [DEFAULT_LMSR_LIQUIDITY]);
+  backfillResolvedBetPayouts();
+  saveDatabase();
+
   // Créer un admin par défaut
   const result = db.exec('SELECT * FROM users WHERE username = "admin"');
   if (result.length === 0 || result[0].values.length === 0) {
@@ -124,5 +190,6 @@ module.exports = {
   getDatabase,
   query,
   queryOne,
-  run
+  run,
+  DEFAULT_LMSR_LIQUIDITY
 };

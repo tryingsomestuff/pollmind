@@ -30,6 +30,82 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTheme(theme);
 });
 
+function logSumExp(values) {
+  const maxValue = Math.max(...values);
+
+  if (!Number.isFinite(maxValue)) {
+    return maxValue;
+  }
+
+  const total = values.reduce((sum, value) => sum + Math.exp(value - maxValue), 0);
+  return maxValue + Math.log(total);
+}
+
+function calculateLMSRCost(quantities, liquidity) {
+  if (quantities.length === 0) {
+    return 0;
+  }
+
+  const scaledQuantities = quantities.map(quantity => quantity / liquidity);
+  return liquidity * logSumExp(scaledQuantities);
+}
+
+function calculateLMSRProbabilities(quantities, liquidity) {
+  if (quantities.length === 0) {
+    return [];
+  }
+
+  const scaledQuantities = quantities.map(quantity => quantity / liquidity);
+  const denominator = logSumExp(scaledQuantities);
+  return scaledQuantities.map(quantity => Math.exp(quantity - denominator));
+}
+
+function solveLMSRTradeForSpend(quantities, optionIndex, spend, liquidity) {
+  const startingCost = calculateLMSRCost(quantities, liquidity);
+  const currentProbabilities = calculateLMSRProbabilities(quantities, liquidity);
+  let low = 0;
+  let high = Math.max(
+    spend / Math.max(currentProbabilities[optionIndex] || 0.000001, 0.000001) * 2,
+    liquidity / 10,
+    1
+  );
+
+  const tradeCostForQuantity = quantity => {
+    const nextQuantities = quantities.slice();
+    nextQuantities[optionIndex] += quantity;
+    return calculateLMSRCost(nextQuantities, liquidity) - startingCost;
+  };
+
+  while (tradeCostForQuantity(high) < spend) {
+    high *= 2;
+  }
+
+  for (let iteration = 0; iteration < 80; iteration++) {
+    const mid = (low + high) / 2;
+    const cost = tradeCostForQuantity(mid);
+
+    if (cost < spend) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  const quantity = (low + high) / 2;
+  const nextQuantities = quantities.slice();
+  nextQuantities[optionIndex] += quantity;
+
+  return {
+    quantity,
+    probabilitiesBefore: currentProbabilities,
+    probabilitiesAfter: calculateLMSRProbabilities(nextQuantities, liquidity)
+  };
+}
+
+function formatProbability(probability) {
+  return `${(probability * 100).toFixed(1)}%`;
+}
+
 // ========== AUTHENTICATION ==========
 
 function showLogin() {
@@ -200,14 +276,14 @@ async function loadQuestions() {
           ${question.description ? `<div class="question-description">${question.description}</div>` : ''}
           <div class="options-grid">
             ${question.options.map(option => {
-              const price = calculatePrice(option.total_shares);
+              const probability = option.probability || 0;
               return `
                 <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
                   <div class="option-info">
                     <div class="option-text">${option.text}</div>
-                    <div class="option-stats">${option.bet_count} paris • ${option.total_shares.toFixed(2)} shares en circulation</div>
+                    <div class="option-stats">${option.bet_count} bets • ${option.total_shares.toFixed(2)} shares outstanding</div>
                   </div>
-                  <div class="option-price">${(price * 100).toFixed(0)}%</div>
+                  <div class="option-price">${formatProbability(probability)}</div>
                   ${question.status === 'open' ? `
                     <button class="btn-bet" onclick="openBetModal(${question.id}, ${option.id}, '${option.text}', '${question.title}')">
                       Bet
@@ -225,12 +301,6 @@ async function loadQuestions() {
   } catch (error) {
     console.error('Error loading questions:', error);
   }
-}
-
-function calculatePrice(totalShares) {
-  const basePrice = 0.5;
-  const priceImpact = totalShares * 0.01;
-  return Math.min(0.95, Math.max(0.05, basePrice + priceImpact));
 }
 
 // ========== BETS ==========
@@ -341,25 +411,33 @@ async function calculateBetPreview() {
     });
     
     const question = await response.json();
-    const option = question.options.find(o => o.id === currentBet.optionId);
-    
-    // Fetch current stats
-    const statsResponse = await fetch(`${API_URL}/questions`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    const allQuestions = await statsResponse.json();
-    const currentQuestion = allQuestions.find(q => q.id === currentBet.questionId);
-    const currentOption = currentQuestion.options.find(o => o.id === currentBet.optionId);
-    
-    const price = calculatePrice(currentOption.total_shares);
-    const shares = amount / price;
+    const liquidity = Number(question.liquidity_param) || 50;
+    const optionIndex = question.options.findIndex(option => option.id === currentBet.optionId);
+
+    if (optionIndex === -1) {
+      throw new Error('Selected option not found in question market');
+    }
+
+    const trade = solveLMSRTradeForSpend(
+      question.options.map(option => option.total_shares || 0),
+      optionIndex,
+      amount,
+      liquidity
+    );
+
+    const currentProbability = trade.probabilitiesBefore[optionIndex] || 0;
+    const nextProbability = trade.probabilitiesAfter[optionIndex] || 0;
+    const shares = trade.quantity;
+    const averagePrice = shares > 0 ? amount / shares : 0;
     
     calcDiv.innerHTML = `
       <p><strong>Stake:</strong> ${amount.toFixed(2)} points</p>
-      <p><strong>Current share price:</strong> ${price.toFixed(2)} point</p>
-      <p><strong>Shares received:</strong> ${shares.toFixed(4)}</p>
+      <p><strong>Current probability:</strong> ${formatProbability(currentProbability)}</p>
+      <p><strong>Estimated shares received:</strong> ${shares.toFixed(4)}</p>
+      <p><strong>Average price paid:</strong> ${averagePrice.toFixed(4)} point per share</p>
+      <p><strong>Probability after this trade:</strong> ${formatProbability(nextProbability)}</p>
       <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 10px;">
-        The points you spend now are converted into shares. If this option wins, you receive a portion of the total pool proportional to your shares.
+        LMSR keeps all answer probabilities normalized. If this option wins, each share pays out 1 point at resolution.
       </p>
     `;
   } catch (error) {
@@ -397,7 +475,7 @@ async function placeBet() {
     const data = await response.json();
     
     if (response.ok) {
-      alert(`Bet placed. You spent ${amount.toFixed(2)} points and received ${data.shares.toFixed(4)} shares at ${data.price.toFixed(2)} point per share.`);
+      alert(`Bet placed. You spent ${amount.toFixed(2)} points, bought ${data.shares.toFixed(4)} shares at an average cost of ${data.price.toFixed(4)} point per share, and moved the probability from ${formatProbability(data.probabilityBefore || 0)} to ${formatProbability(data.probabilityAfter || 0)}.`);
       closeBetModal();
       await refreshProfile();
       loadQuestions();
@@ -461,7 +539,7 @@ async function loadMyBets() {
             ${!isOwnBet ? `<p><strong>Bettor:</strong> ${bet.bettor_username}</p>` : ''}
             <p><strong>${pickLabel}:</strong> ${bet.option_text}</p>
             <p><strong>${stakeLabel}:</strong> ${bet.amount.toFixed(2)} points</p>
-            <p><strong>Purchase price:</strong> ${bet.price.toFixed(2)} point per share • <strong>Shares bought:</strong> ${bet.shares.toFixed(4)}</p>
+            <p><strong>Average purchase price:</strong> ${bet.price.toFixed(4)} point per share • <strong>Shares bought:</strong> ${bet.shares.toFixed(4)}</p>
             ${bet.is_winner ? `<p><strong>Payout at resolution:</strong> ${bet.payout.toFixed(2)} points</p>` : ''}
             <p><strong>Date:</strong> ${formatDate(bet.created_at)}</p>
             <span class="bet-status ${statusClass}">${statusText}</span>
@@ -653,7 +731,7 @@ async function loadAdminData() {
             <div class="option-item ${option.is_correct ? 'option-correct' : ''}">
               <div class="option-info">
                 <div class="option-text">${option.text}</div>
-                <div class="option-stats">${option.bet_count} paris • ${option.total_shares.toFixed(2)} shares en circulation</div>
+                <div class="option-stats">${option.bet_count} bets • ${option.total_shares.toFixed(2)} shares outstanding</div>
               </div>
               ${question.status === 'open' ? `
                 <button class="btn-resolve" onclick="resolveQuestion(${question.id}, ${option.id})">

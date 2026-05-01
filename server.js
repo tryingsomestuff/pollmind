@@ -3,7 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { initDatabase, query, queryOne, run, saveDatabase } = require('./db');
+const { initDatabase, query, queryOne, run, saveDatabase, DEFAULT_LMSR_LIQUIDITY } = require('./db');
 
 const app = express();
 const PORT = 3000;
@@ -58,6 +58,104 @@ const requireAdmin = (req, res, next) => {
   }
   next();
 };
+
+function logSumExp(values) {
+  const maxValue = Math.max(...values);
+
+  if (!Number.isFinite(maxValue)) {
+    return maxValue;
+  }
+
+  const total = values.reduce((sum, value) => sum + Math.exp(value - maxValue), 0);
+  return maxValue + Math.log(total);
+}
+
+function calculateLMSRCost(quantities, liquidity) {
+  if (quantities.length === 0) {
+    return 0;
+  }
+
+  const scaledQuantities = quantities.map(quantity => quantity / liquidity);
+  return liquidity * logSumExp(scaledQuantities);
+}
+
+function calculateLMSRProbabilities(quantities, liquidity) {
+  if (quantities.length === 0) {
+    return [];
+  }
+
+  const scaledQuantities = quantities.map(quantity => quantity / liquidity);
+  const denominator = logSumExp(scaledQuantities);
+  return scaledQuantities.map(quantity => Math.exp(quantity - denominator));
+}
+
+function buildQuestionMarketOptions(questionId, liquidity) {
+  const options = query('SELECT * FROM options WHERE question_id = ?', [questionId]);
+  const optionStats = options.map(option => {
+    const stats = queryOne(
+      'SELECT SUM(shares) as total_shares, COUNT(*) as bet_count FROM bets WHERE option_id = ?',
+      [option.id]
+    );
+
+    return {
+      ...option,
+      total_shares: stats?.total_shares || 0,
+      bet_count: stats?.bet_count || 0
+    };
+  });
+
+  const probabilities = calculateLMSRProbabilities(
+    optionStats.map(option => option.total_shares),
+    liquidity
+  );
+
+  return optionStats.map((option, index) => ({
+    ...option,
+    probability: probabilities[index] || 0
+  }));
+}
+
+function solveLMSRTradeForSpend(quantities, optionIndex, spend, liquidity) {
+  const startingCost = calculateLMSRCost(quantities, liquidity);
+  const currentProbabilities = calculateLMSRProbabilities(quantities, liquidity);
+  let low = 0;
+  let high = Math.max(
+    spend / Math.max(currentProbabilities[optionIndex] || 0.000001, 0.000001) * 2,
+    liquidity / 10,
+    1
+  );
+
+  const tradeCostForQuantity = quantity => {
+    const nextQuantities = quantities.slice();
+    nextQuantities[optionIndex] += quantity;
+    return calculateLMSRCost(nextQuantities, liquidity) - startingCost;
+  };
+
+  while (tradeCostForQuantity(high) < spend) {
+    high *= 2;
+  }
+
+  for (let iteration = 0; iteration < 80; iteration++) {
+    const mid = (low + high) / 2;
+    const cost = tradeCostForQuantity(mid);
+
+    if (cost < spend) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  const quantity = (low + high) / 2;
+  const nextQuantities = quantities.slice();
+  nextQuantities[optionIndex] += quantity;
+
+  return {
+    quantity,
+    probabilitiesBefore: currentProbabilities,
+    probabilitiesAfter: calculateLMSRProbabilities(nextQuantities, liquidity)
+  };
+}
 
 // ========== AUTHENTICATION ROUTES ==========
 
@@ -254,17 +352,8 @@ app.get('/api/questions', authenticateToken, (req, res) => {
     const questions = query('SELECT q.*, u.username as creator_name FROM questions q JOIN users u ON q.created_by = u.id ORDER BY q.created_at DESC');
 
     const questionsWithDetails = questions.map(q => {
-      const options = query('SELECT * FROM options WHERE question_id = ?', [q.id]);
-
-      const optionsWithStats = options.map(opt => {
-        const stats = queryOne('SELECT SUM(shares) as total_shares, COUNT(*) as bet_count FROM bets WHERE option_id = ?', [opt.id]);
-        
-        return {
-          ...opt,
-          total_shares: stats?.total_shares || 0,
-          bet_count: stats?.bet_count || 0
-        };
-      });
+      const liquidity = Number(q.liquidity_param) || DEFAULT_LMSR_LIQUIDITY;
+      const optionsWithStats = buildQuestionMarketOptions(q.id, liquidity);
 
       return { ...q, options: optionsWithStats };
     });
@@ -287,7 +376,8 @@ app.get('/api/questions/:id', authenticateToken, (req, res) => {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    const options = query('SELECT * FROM options WHERE question_id = ?', [questionId]);
+    const liquidity = Number(question.liquidity_param) || DEFAULT_LMSR_LIQUIDITY;
+    const options = buildQuestionMarketOptions(questionId, liquidity);
 
     res.json({ ...question, options });
   } catch (error) {
@@ -366,26 +456,24 @@ app.delete('/api/questions/:id', authenticateToken, requireAdmin, (req, res) => 
 // Redistribute winnings
 function distributeWinnings(questionId, correctOptionId) {
   try {
-    const winningBets = query('SELECT id, user_id, shares FROM bets WHERE question_id = ? AND option_id = ?', [questionId, correctOptionId]);
+    const bets = query('SELECT id, user_id, option_id, shares FROM bets WHERE question_id = ?', [questionId]);
+    let totalPayout = 0;
+    let winnerCount = 0;
 
-    const poolData = queryOne('SELECT SUM(amount) as total_pool FROM bets WHERE question_id = ?', [questionId]);
-    const totalPool = poolData?.total_pool || 0;
+    bets.forEach(bet => {
+      const payout = Number(bet.option_id) === Number(correctOptionId) ? bet.shares : 0;
+      run('UPDATE bets SET payout = ? WHERE id = ?', [payout, bet.id]);
 
-    if (winningBets.length === 0) {
-      return { totalPool, totalWinningShares: 0, winnerCount: 0 };
-    }
-
-    const totalWinningShares = winningBets.reduce((sum, bet) => sum + bet.shares, 0);
-
-    winningBets.forEach(bet => {
-      const winnings = (bet.shares / totalWinningShares) * totalPool;
-      run('UPDATE users SET points = points + ? WHERE id = ?', [winnings, bet.user_id]);
+      if (payout > 0) {
+        run('UPDATE users SET points = points + ? WHERE id = ?', [payout, bet.user_id]);
+        totalPayout += payout;
+        winnerCount += 1;
+      }
     });
 
     return {
-      totalPool,
-      totalWinningShares,
-      winnerCount: winningBets.length
+      totalPayout,
+      winnerCount
     };
   } catch (error) {
     console.error('Winnings distribution error:', error);
@@ -394,13 +482,6 @@ function distributeWinnings(questionId, correctOptionId) {
 }
 
 // ========== BET ROUTES ==========
-
-// Calculate the current price
-function calculatePrice(totalShares) {
-  const basePrice = 0.5;
-  const priceImpact = totalShares * 0.01;
-  return Math.min(0.95, Math.max(0.05, basePrice + priceImpact));
-}
 
 // Place a bet
 app.post('/api/bets', authenticateToken, (req, res) => {
@@ -411,7 +492,7 @@ app.post('/api/bets', authenticateToken, (req, res) => {
   }
 
   try {
-    const question = queryOne('SELECT status FROM questions WHERE id = ?', [questionId]);
+    const question = queryOne('SELECT id, status, liquidity_param FROM questions WHERE id = ?', [questionId]);
     
     if (!question || question.status !== 'open') {
       return res.status(400).json({ error: 'Question is closed or does not exist' });
@@ -423,16 +504,37 @@ app.post('/api/bets', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Not enough points' });
     }
 
-    const stats = queryOne('SELECT SUM(shares) as total_shares FROM bets WHERE option_id = ?', [optionId]);
+    const liquidity = Number(question.liquidity_param) || DEFAULT_LMSR_LIQUIDITY;
+    const options = buildQuestionMarketOptions(questionId, liquidity);
+    const optionIndex = options.findIndex(option => Number(option.id) === Number(optionId));
 
-    const currentTotalShares = stats?.total_shares || 0;
-    const price = calculatePrice(currentTotalShares);
-    const shares = amount / price;
+    if (optionIndex === -1) {
+      return res.status(400).json({ error: 'Invalid option for this question' });
+    }
+
+    const trade = solveLMSRTradeForSpend(
+      options.map(option => option.total_shares),
+      optionIndex,
+      amount,
+      liquidity
+    );
+
+    const purchasedShares = trade.quantity;
+    const averagePrice = purchasedShares > 0 ? amount / purchasedShares : 0;
 
     run('UPDATE users SET points = points - ? WHERE id = ?', [amount, req.user.id]);
-    run('INSERT INTO bets (user_id, question_id, option_id, amount, price, shares) VALUES (?, ?, ?, ?, ?, ?)', [req.user.id, questionId, optionId, amount, price, shares]);
+    run(
+      'INSERT INTO bets (user_id, question_id, option_id, amount, price, shares, payout) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [req.user.id, questionId, optionId, amount, averagePrice, purchasedShares, null]
+    );
 
-    res.json({ message: 'Bet placed', shares, price });
+    res.json({
+      message: 'Bet placed',
+      shares: purchasedShares,
+      price: averagePrice,
+      probabilityBefore: trade.probabilitiesBefore[optionIndex],
+      probabilityAfter: trade.probabilitiesAfter[optionIndex]
+    });
   } catch (error) {
     console.error('Bet error:', error);
     res.status(500).json({ error: 'Bet placement failed' });
@@ -453,45 +555,15 @@ app.get('/api/my-bets', authenticateToken, (req, res) => {
         [req.user.id]
       );
 
-    const resolvedQuestionIds = [...new Set(
-      bets
-        .filter(bet => bet.question_status === 'resolved')
-        .map(bet => bet.question_id)
-    )];
-
-    const resolutionStats = new Map();
-
-    resolvedQuestionIds.forEach(questionId => {
-      const poolData = queryOne('SELECT SUM(amount) as total_pool FROM bets WHERE question_id = ?', [questionId]);
-      const winningSharesData = queryOne(
-        'SELECT SUM(shares) as total_winning_shares FROM bets WHERE question_id = ? AND option_id = (SELECT resolution FROM questions WHERE id = ?)',
-        [questionId, questionId]
-      );
-
-      resolutionStats.set(questionId, {
-        totalPool: poolData?.total_pool || 0,
-        totalWinningShares: winningSharesData?.total_winning_shares || 0
-      });
-    });
-
     const enrichedBets = bets.map(bet => {
       const isResolved = bet.question_status === 'resolved';
       const isWinningBet = isResolved && Number(bet.question_resolution) === Number(bet.option_id);
-      let payout = 0;
-
-      if (isWinningBet) {
-        const stats = resolutionStats.get(bet.question_id);
-
-        if (stats && stats.totalWinningShares > 0) {
-          payout = (bet.shares / stats.totalWinningShares) * stats.totalPool;
-        }
-      }
 
       return {
         ...bet,
         is_resolved: isResolved,
         is_winner: isWinningBet,
-        payout,
+        payout: bet.payout || 0,
         can_view_all_bets: canViewAllBets
       };
     });
