@@ -6,7 +6,7 @@
 
 ```bash
 # Construire et démarrer
-docker compose up -d
+docker compose up -d --build
 
 # Voir les logs
 docker compose logs -f
@@ -15,7 +15,11 @@ docker compose logs -f
 docker compose down
 ```
 
-L'application sera accessible sur : **http://localhost:3000**
+L'application sera accessible sur : **http://localhost:81**
+
+Il n'est pas necessaire d'executer `npm install` sur la machine hote pour utiliser Docker. Le build de l'image lance `npm ci` a partir de `package.json` et `package-lock.json`.
+
+En revanche, si vous modifiez les dependances ou le registry npm, il faut d'abord regenerer `package-lock.json` avec npm sur l'hote, puis rebuilder l'image.
 
 ### Option 2 : Docker uniquement
 

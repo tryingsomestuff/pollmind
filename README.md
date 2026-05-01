@@ -7,11 +7,15 @@ Système de marché de prédiction interne pour questions scientifiques et techn
 ### Option 1 : Docker (recommandé)
 
 ```bash
-# Démarrer avec Docker Compose
-docker compose up -d
+# Construire et démarrer avec Docker Compose
+docker compose up -d --build
 
-# L'application sera accessible sur http://localhost:3000
+# L'application sera accessible sur http://localhost:81
 ```
+
+Pour Docker, il n'est pas nécessaire d'executer `npm install` sur la machine hote avant le build. L'image copie `package.json` et `package-lock.json`, puis installe les dependances avec `npm ci` dans le conteneur.
+
+Le prerequis cote depot est simplement d'avoir un `package-lock.json` present et a jour.
 
 **Voir [DOCKER.md](DOCKER.md) pour la documentation complète Docker**
 
@@ -28,6 +32,7 @@ npm start
 Pour le développement avec auto-reload:
 ```bash
 npm run dev
+```
 
 ## ⚙️ Configuration NPM Registry
 
@@ -67,17 +72,17 @@ npm install
 
 ### Rebuild Docker après changement de registry
 
-Après avoir changé le registry et régénéré le \`package-lock.json\`, il faut rebuilder l'image Docker :
+Si vous changez de registry npm, il faut regenerer le `package-lock.json` avec npm sur la machine hote, puis rebuilder l'image Docker :
 
 ```bash
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
+rm -rf node_modules package-lock.json
+npm install
+docker compose down
+docker compose build --no-cache
+docker compose up -d
 ```
 
-**⚠️ Note importante** : Le \`package-lock.json\` contient les URLs exactes des packages. Il doit être régénéré à chaque changement de registry, ainsi que le dossier \`node_modules\`.
-
-```
+**⚠️ Note importante** : Le `package-lock.json` contient les URLs exactes des packages. Il doit etre regenere a chaque changement de registry, ainsi que le dossier `node_modules`.
 
 
 ## 🌐 Configuration Apache Reverse Proxy
@@ -166,7 +171,7 @@ L'application Node.js écoute toujours sur le port 3000 **à l'intérieur** du c
 
 ## Utilisation
 
-1. Accédez à `http://localhost:3000`
+1. Accedez a `http://localhost:81` en Docker, ou `http://localhost:3000` en local
 2. Créez un compte ou connectez-vous
 3. Les admins peuvent créer des questions
 4. Les participants peuvent parier avec leurs points (100 au départ)
